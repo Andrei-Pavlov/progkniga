@@ -1,0 +1,26 @@
+[package]
+name = "storyweaver_desktop"
+version = "1.0.0"
+description = "StoryWeaver - Professional offline-first writing application"
+authors = ["StoryWeaver"]
+license = ""
+repository = ""
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+uuid = { version = "1", features = ["v4"] }
+base64 = "0.22"
+reqwest = { version = "0.12", features = ["json"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

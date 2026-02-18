@@ -1,0 +1,16 @@
+{
+  "name": "storyweaver-auth-service",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.cjs",
+  "scripts": {
+    "start": "node index.cjs"
+  },
+  "dependencies": {
+    "@tma.js/init-data-node": "^2.0.6",
+    "dotenv": "^17.3.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
