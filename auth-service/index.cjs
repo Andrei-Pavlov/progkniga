@@ -20,7 +20,9 @@ const TRIBUTE_API = process.env.TRIBUTE_API_URL || 'https://tribute.tg/api/v1';
 const TRIBUTE_API_KEY = process.env.TRIBUTE_API_KEY || '';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const AUTH_BASE_URL = (process.env.AUTH_BASE_URL || '').replace(/\/$/, '');
-const SUBS_FILE = path.join(__dirname, 'subscriptions.json');
+// Railway: примонтируйте Volume к /data, задайте DATA_DIR=/data — иначе subscriptions сбрасываются при каждом деплое
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const SUBS_FILE = path.join(DATA_DIR, 'subscriptions.json');
 
 let subscriptions = new Map();
 const sessions = new Map(); // sessionId -> { telegramId, done, expiresAt }
@@ -35,6 +37,8 @@ function loadSubscriptions() {
 
 function saveSubscriptions() {
   try {
+    const dir = path.dirname(SUBS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(SUBS_FILE, JSON.stringify(Object.fromEntries(subscriptions), null, 2));
   } catch (e) {
     console.error('[Auth] save:', e.message);
@@ -333,6 +337,7 @@ process.on('SIGINT', shutdown);
 
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`StoryWeaver Auth Service on port ${PORT}`);
+  console.log('[Config] subscriptions:', SUBS_FILE, '(', subscriptions.size, 'записей)');
   console.log('[Config] AUTH_BASE_URL:', AUTH_BASE_URL || '(not set)');
   if (BOT_TOKEN && AUTH_BASE_URL) {
     const webhookUrl = AUTH_BASE_URL + '/bot/webhook';

@@ -106,10 +106,12 @@ npm run tauri:dev
 
 ## Если «Нет активной подписки»
 
-Webhook Tribute может не срабатывать (другой URL, не настроен и т.п.). Временно добавьте себя вручную:
+**Railway:** Без Volume и `DATA_DIR=/data` список подписчиков сбрасывается при каждом деплое. Добавьте Volume и переменную.
+
+**Webhook Tribute** может не срабатывать. Временно добавьте себя вручную:
 
 1. Узнайте свой Telegram ID: напишите боту [@userinfobot](https://t.me/userinfobot).
-2. Откройте в браузере: `http://localhost:3847/auth/add?telegram_id=ВАШ_ID`
+2. Откройте: `https://ваш-auth-url/auth/add?telegram_id=ВАШ_ID` (или `http://localhost:3847/auth/add?telegram_id=ВАШ_ID` для локального запуска)
 3. После этого войдите через бота как обычно.
 
 ---
@@ -124,11 +126,10 @@ Webhook Tribute может не срабатывать (другой URL, не �
 
 **Пример Railway:**
 - Создайте проект, добавьте сервис из GitHub
-- Root Directory: `auth-service` (или загрузите только папку auth-service)
-- Build: `npm install`
-- Start: `npm start` (или `node index.cjs`)
-- Добавьте переменные: `TRIBUTE_API_KEY`, `TELEGRAM_BOT_TOKEN`, `AUTH_BASE_URL` = URL вашего сервиса (например `https://storyweaver-auth.up.railway.app`)
-- В Tribute Creator Dashboard → Webhook URL: `https://ваш-url/webhook/tribute`
+- Root Directory: `auth-service`
+- Переменные: `TRIBUTE_API_KEY`, `TELEGRAM_BOT_TOKEN`, `AUTH_BASE_URL`, `DATA_DIR=/data`
+- **Volume** (Settings → Volumes): Mount Path = `/data` — иначе подписчики сбрасываются при каждом деплое
+- Tribute Creator Dashboard → Webhook URL: `https://ваш-url/webhook/tribute`
 
 ### 2. Соберите приложение с URL вашего auth-service
 
