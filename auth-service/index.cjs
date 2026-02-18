@@ -324,7 +324,7 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Not found' }));
 });
 
-server.listen(PORT, async () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`StoryWeaver Auth Service on port ${PORT}`);
   console.log('[Config] AUTH_BASE_URL:', AUTH_BASE_URL || '(not set)');
   if (BOT_TOKEN && AUTH_BASE_URL) {
