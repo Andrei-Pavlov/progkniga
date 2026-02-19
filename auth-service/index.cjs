@@ -48,7 +48,8 @@ function saveSubscriptions() {
 loadSubscriptions();
 
 function getTelegramId(payload) {
-  const u = payload.user;
+  if (!payload || typeof payload !== 'object') return null;
+  const u = payload.user ?? payload.subscriber ?? payload.data?.user;
   if (u && typeof u === 'object') {
     const id = u.telegram_id ?? u.telegram_user_id ?? u.id ?? u.user_id;
     if (id != null) return id;
@@ -58,7 +59,8 @@ function getTelegramId(payload) {
     payload.telegram_id ??
     payload.user_id ??
     payload.subscriber_id ??
-    payload.telegram_user
+    payload.telegram_user ??
+    payload.data?.telegram_user_id
   );
 }
 
@@ -306,19 +308,21 @@ const server = http.createServer(async (req, res) => {
         }
       }
       try {
-        const payload = JSON.parse(body);
-        const event = payload.event || payload.type;
-        const tgId = String(getTelegramId(payload) || '');
+        const raw = JSON.parse(body);
+        // Tribute оборачивает: { name, payload, created_at, sent_at }
+        const payload = raw.payload || raw;
+        const event = raw.name || payload.event || payload.type;
+        const tgId = String(getTelegramId(payload) || getTelegramId(raw) || '');
         console.log('[Tribute] event:', event, 'tgId:', tgId || '(not found)');
-        if (!tgId) {
-          console.log('[Tribute] payload keys:', Object.keys(payload));
-          if (payload.user) console.log('[Tribute] payload.user:', JSON.stringify(payload.user));
+        if (!tgId && payload && typeof payload === 'object') {
+          console.log('[Tribute] payload:', JSON.stringify(payload).slice(0, 500));
         }
         const isNew = ['newSubscription', 'renewedSubscription', 'new_subscription', 'renewed_subscription'].includes(event);
         const isCancel = ['cancelledSubscription', 'cancelled_subscription'].includes(event);
         if (tgId) {
           if (isNew) {
-            subscriptions.set(tgId, { active: true, expiresAt: payload.expires_at || payload.expiresAt || null });
+            const exp = payload.expires_at ?? payload.expiresAt ?? raw.expires_at ?? raw.expiresAt;
+            subscriptions.set(tgId, { active: true, expiresAt: exp || null });
             saveSubscriptions();
             console.log('[Tribute] added:', tgId);
           } else if (isCancel) {
