@@ -49,13 +49,16 @@ loadSubscriptions();
 
 function getTelegramId(payload) {
   const u = payload.user;
-  if (u && typeof u === 'object') return u.telegram_id ?? u.telegram_user_id ?? u.id ?? u.user_id;
+  if (u && typeof u === 'object') {
+    const id = u.telegram_id ?? u.telegram_user_id ?? u.id ?? u.user_id;
+    if (id != null) return id;
+  }
   return (
     payload.telegram_user_id ??
-    payload.telegram_user ??
+    payload.telegram_id ??
     payload.user_id ??
     payload.subscriber_id ??
-    payload.telegram_id
+    payload.telegram_user
   );
 }
 
@@ -292,9 +295,11 @@ const server = http.createServer(async (req, res) => {
       let body = '';
       for await (const chunk of req) body += chunk;
       const sig = req.headers['trbt-signature'];
+      console.log('[Tribute] webhook received, sig:', !!sig, 'bodyLen:', body.length);
       if (TRIBUTE_API_KEY && sig) {
         const expected = crypto.createHmac('sha256', TRIBUTE_API_KEY).update(body).digest('hex');
         if (sig !== expected) {
+          console.log('[Tribute] 401 Invalid signature (check TRIBUTE_API_KEY)');
           res.writeHead(401);
           res.end(JSON.stringify({ error: 'Invalid signature' }));
           return;
@@ -302,21 +307,28 @@ const server = http.createServer(async (req, res) => {
       }
       try {
         const payload = JSON.parse(body);
-        const event = payload.event;
+        const event = payload.event || payload.type;
         const tgId = String(getTelegramId(payload) || '');
-        console.log(`[Tribute] ${event}`, tgId || '(no tg id)');
-        if (!tgId) console.log('[Tribute] payload keys:', Object.keys(payload));
+        console.log('[Tribute] event:', event, 'tgId:', tgId || '(not found)');
+        if (!tgId) {
+          console.log('[Tribute] payload keys:', Object.keys(payload));
+          if (payload.user) console.log('[Tribute] payload.user:', JSON.stringify(payload.user));
+        }
+        const isNew = ['newSubscription', 'renewedSubscription', 'new_subscription', 'renewed_subscription'].includes(event);
+        const isCancel = ['cancelledSubscription', 'cancelled_subscription'].includes(event);
         if (tgId) {
-          if (event === 'newSubscription' || event === 'renewedSubscription') {
-            subscriptions.set(tgId, { active: true, expiresAt: payload.expires_at || null });
+          if (isNew) {
+            subscriptions.set(tgId, { active: true, expiresAt: payload.expires_at || payload.expiresAt || null });
             saveSubscriptions();
-          } else if (event === 'cancelledSubscription') {
+            console.log('[Tribute] added:', tgId);
+          } else if (isCancel) {
             subscriptions.delete(tgId);
             saveSubscriptions();
+            console.log('[Tribute] removed:', tgId);
           }
         }
       } catch (e) {
-        console.error('[Tribute]', e);
+        console.error('[Tribute] parse error:', e.message);
       }
       res.writeHead(200);
       res.end(JSON.stringify({ received: true }));
