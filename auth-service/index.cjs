@@ -320,8 +320,8 @@ const server = http.createServer(async (req, res) => {
         const event = raw.name || payload.event || payload.type;
         const tgId = String(getTelegramId(payload) || getTelegramId(raw) || '');
         console.log('[Tribute] event:', event, 'tgId:', tgId || '(not found)');
-        if (!tgId && payload && typeof payload === 'object') {
-          console.log('[Tribute] payload:', JSON.stringify(payload).slice(0, 500));
+        if (!tgId) {
+          console.log('[Tribute] RAW (для отладки):', JSON.stringify(raw));
         }
         const isNew = ['newSubscription', 'renewedSubscription', 'new_subscription', 'renewed_subscription'].includes(event);
         const isCancel = ['cancelledSubscription', 'cancelled_subscription'].includes(event);
