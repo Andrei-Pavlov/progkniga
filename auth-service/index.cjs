@@ -54,14 +54,16 @@ function getTelegramId(payload) {
     const id = u.telegram_id ?? u.telegram_user_id ?? u.id ?? u.user_id;
     if (id != null) return id;
   }
-  return (
-    payload.telegram_user_id ??
-    payload.telegram_id ??
-    payload.user_id ??
-    payload.subscriber_id ??
-    payload.telegram_user ??
-    payload.data?.telegram_user_id
-  );
+  const direct = payload.telegram_user_id ?? payload.telegram_id ?? payload.user_id ?? payload.subscriber_id ?? payload.telegram_user ?? payload.data?.telegram_user_id;
+  if (direct != null) return direct;
+  // Рекурсивный поиск (Tribute может вкладывать по-разному)
+  for (const v of Object.values(payload)) {
+    if (typeof v === 'object' && v !== null && ('telegram_user_id' in v || 'telegram_id' in v)) {
+      const id = v.telegram_user_id ?? v.telegram_id ?? v.id ?? v.user_id;
+      if (id != null) return id;
+    }
+  }
+  return null;
 }
 
 // Проверка initData через @tma.js/init-data-node
