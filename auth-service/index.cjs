@@ -309,6 +309,12 @@ const server = http.createServer(async (req, res) => {
       }
       try {
         const raw = JSON.parse(body);
+        if (raw.test_event === 'test_event') {
+          console.log('[Tribute] test event OK — webhook настроен');
+          res.writeHead(200);
+          res.end(JSON.stringify({ received: true }));
+          return;
+        }
         // Tribute оборачивает: { name, payload, created_at, sent_at }
         const payload = raw.payload || raw;
         const event = raw.name || payload.event || payload.type;
