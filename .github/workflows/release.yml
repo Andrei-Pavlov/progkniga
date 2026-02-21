@@ -64,4 +64,4 @@ jobs:
           releaseBody: 'См. assets для скачивания.'
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --verbose

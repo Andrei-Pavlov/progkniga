@@ -21,6 +21,7 @@ uuid = { version = "1", features = ["v4"] }
 base64 = "0.22"
 reqwest = { version = "0.12", features = ["json"] }
 tauri-plugin-process = "2"
+tauri-plugin-app = "2.0.0-alpha.2"
 
 [features]
 default = ["custom-protocol"]
