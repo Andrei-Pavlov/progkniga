@@ -68,6 +68,6 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'StoryWeaver v__VERSION__'
           releaseBody: 'См. assets для скачивания.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }} --verbose

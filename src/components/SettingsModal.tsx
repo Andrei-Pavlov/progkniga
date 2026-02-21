@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useStore, type Theme, type AccentColor } from '../store';
-import { useUpdater } from '../hooks/useUpdater';
 
 const FONT_OPTIONS = [
   { value: 'Georgia, serif', label: 'Georgia' },
@@ -58,8 +57,6 @@ export function SettingsModal() {
 
   const [tab, setTab] = useState<Tab>('editor');
   const [appVersion, setAppVersion] = useState('1.0.0');
-  const { update, checking, downloading, error, checkForUpdates, installAndRelaunch } = useUpdater();
-
   useEffect(() => {
     invoke<string>('get_app_version').then(setAppVersion).catch(() => {});
   }, []);
@@ -224,48 +221,9 @@ export function SettingsModal() {
             <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
               {`StoryWeaver v${appVersion}`}
             </p>
-            {error && (
-              <p style={{ fontSize: 13, color: 'var(--accent)', margin: 0 }}>{error}</p>
-            )}
-            {update ? (
-              <div>
-                <p style={{ fontSize: 14, marginBottom: 12 }}>
-                  Доступна версия {update.version}
-                  {update.body && ` — ${update.body}`}
-                </p>
-                <button
-                  onClick={installAndRelaunch}
-                  disabled={downloading}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: 14,
-                    background: 'var(--accent)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 6,
-                    cursor: downloading ? 'wait' : 'pointer',
-                  }}
-                >
-                  {downloading ? 'Загрузка...' : 'Установить и перезапустить'}
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => checkForUpdates()}
-                disabled={checking}
-                style={{
-                  padding: '8px 16px',
-                  fontSize: 14,
-                  background: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 6,
-                  cursor: checking ? 'wait' : 'pointer',
-                }}
-              >
-                {checking ? 'Проверка...' : 'Проверить обновления'}
-              </button>
-            )}
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              Проверка обновлений доступна в главном меню.
+            </p>
           </div>
         )}
 

@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { useStore } from '../store';
+import { useUpdater } from '../hooks/useUpdater';
 
 interface MainMenuProps {
   onExportWord?: () => void;
@@ -9,6 +11,11 @@ export function MainMenu({ onExportWord }: MainMenuProps) {
   const setSearchOpen = useStore((s) => s.setSearchOpen);
   const setAuthenticated = useStore((s) => s.setAuthenticated);
   const setCurrentProject = useStore((s) => s.setCurrentProject);
+  const { update, checking, downloading, error, checkForUpdates, installAndRelaunch } = useUpdater();
+
+  useEffect(() => {
+    checkForUpdates();
+  }, [checkForUpdates]);
 
   const handleCloseProject = () => {
     setCurrentProject(null);
@@ -65,6 +72,56 @@ export function MainMenu({ onExportWord }: MainMenuProps) {
         >
           Поиск
         </button>
+        {update ? (
+          <button
+            onClick={installAndRelaunch}
+            disabled={downloading}
+            title={`Доступна версия ${update.version}`}
+            style={{
+              padding: '4px 12px',
+              fontSize: 13,
+              background: 'var(--accent)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: downloading ? 'wait' : 'pointer',
+            }}
+          >
+            {downloading ? 'Загрузка...' : `Обновление ${update.version}`}
+          </button>
+        ) : error ? (
+          <button
+            onClick={checkForUpdates}
+            disabled={checking}
+            title={error}
+            style={{
+              padding: '4px 12px',
+              fontSize: 13,
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              border: '1px dashed var(--border)',
+              borderRadius: 4,
+              cursor: checking ? 'wait' : 'pointer',
+            }}
+          >
+            {checking ? '...' : 'Проверить обновления'}
+          </button>
+        ) : (
+          <button
+            onClick={checkForUpdates}
+            disabled={checking}
+            style={{
+              padding: '4px 12px',
+              fontSize: 13,
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              border: 'none',
+              cursor: checking ? 'wait' : 'pointer',
+            }}
+          >
+            {checking ? 'Проверка обновлений...' : 'Обновления'}
+          </button>
+        )}
         {onExportWord && (
           <button
             onClick={onExportWord}

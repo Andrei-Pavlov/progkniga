@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useStore } from '../store';
+import { useUpdater } from '../hooks/useUpdater';
 import QRCode from 'qrcode';
 
 const TELEGRAM_BOT = 'StoWeaBot';
@@ -8,6 +9,7 @@ const TELEGRAM_CHANNEL = 'WeaverStory';
 
 export function LoginScreen() {
   const setAuthenticated = useStore((s) => s.setAuthenticated);
+  const { update, checking, downloading, checkForUpdates, installAndRelaunch } = useUpdater();
   const [loading, setLoading] = useState(false);
   const [appVersion, setAppVersion] = useState('');
   const [error, setError] = useState('');
@@ -19,10 +21,11 @@ export function LoginScreen() {
 
   useEffect(() => {
     invoke<string>('get_app_version').then(setAppVersion).catch(() => {});
+    checkForUpdates();
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, []);
+  }, [checkForUpdates]);
 
   const startPolling = (sessionId: string) => {
     pollRef.current = setInterval(async () => {
@@ -134,19 +137,53 @@ export function LoginScreen() {
         Подпишитесь на t.me/{TELEGRAM_CHANNEL} через Tribute. Вход проверяет подписку автоматически.
       </p>
 
-      {appVersion && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 12,
-            right: 16,
-            fontSize: 12,
-            color: 'var(--text-secondary)',
-          }}
-        >
-          v{appVersion}
-        </div>
-      )}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 12,
+          right: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          fontSize: 12,
+          color: 'var(--text-secondary)',
+        }}
+      >
+        {update ? (
+          <button
+            onClick={installAndRelaunch}
+            disabled={downloading}
+            style={{
+              padding: '4px 10px',
+              fontSize: 12,
+              background: 'var(--accent)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: downloading ? 'wait' : 'pointer',
+            }}
+          >
+            {downloading ? 'Загрузка...' : `Обновление ${update.version}`}
+          </button>
+        ) : (
+          <button
+            onClick={checkForUpdates}
+            disabled={checking}
+            style={{
+              padding: 0,
+              fontSize: 12,
+              background: 'none',
+              color: 'var(--text-secondary)',
+              border: 'none',
+              cursor: checking ? 'wait' : 'pointer',
+              textDecoration: 'underline',
+            }}
+          >
+            {checking ? 'Проверка...' : 'Проверить обновления'}
+          </button>
+        )}
+        {appVersion && <span>v{appVersion}</span>}
+      </div>
 
       {showQr && qrDataUrl && (
         <div
