@@ -68,9 +68,6 @@ export function LoginScreen() {
       setQrDataUrl(dataUrl);
       setShowQr(true);
       startPolling(sessionId);
-      try {
-        await invoke('open_telegram_auth', { url });
-      } catch (_) {}
     } catch (e) {
       setLoading(false);
       setError('Не удалось сгенерировать QR-код');
