@@ -22,6 +22,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const AUTH_BASE_URL = (process.env.AUTH_BASE_URL || '').replace(/\/$/, '');
 // Канал для проверки подписки (@WeaverStory). Бот должен быть админом канала.
 const TELEGRAM_CHANNEL = (process.env.TELEGRAM_CHANNEL || 'WeaverStory').replace(/^@?/, '@');
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 // Railway: примонтируйте Volume к /data, задайте DATA_DIR=/data — иначе subscriptions сбрасываются при каждом деплое
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 const SUBS_FILE = path.join(DATA_DIR, 'subscriptions.json');
@@ -234,6 +235,24 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200);
       res.end(JSON.stringify({ success: false, error: 'Ошибка сервера' }));
     }
+    return;
+  }
+
+  // Список подписчиков — localhost или ?token=ADMIN_TOKEN
+  if (url.pathname === '/auth/subscribers' && req.method === 'GET') {
+    const token = url.searchParams.get('token');
+    const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
+    const remote = forwarded || req.socket?.remoteAddress || '';
+    const isLocal = /^(127\.|::1|localhost)/.test(remote) || remote === '';
+    const hasToken = ADMIN_TOKEN && token === ADMIN_TOKEN;
+    if (!isLocal && !hasToken) {
+      res.writeHead(403);
+      res.end(JSON.stringify({ error: 'Only localhost or valid token' }));
+      return;
+    }
+    const list = Object.fromEntries(subscriptions);
+    res.writeHead(200);
+    res.end(JSON.stringify({ count: subscriptions.size, subscribers: list }, null, 2));
     return;
   }
 
