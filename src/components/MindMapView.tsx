@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useStore } from '../store';
 import ReactFlow, {
@@ -129,6 +129,16 @@ export function MindMapView() {
   const [chapters, setChapters] = useState<{ id: string; title: string }[]>([]);
   const setSelectedChapterId = useStore((s) => s.setSelectedChapterId);
   const setViewMode = useStore((s) => s.setViewMode);
+  const isDraggingRef = useRef(false);
+  const mindMapRef = useRef<HTMLDivElement>(null);
+  const rfInstanceRef = useRef<{ screenToFlowPosition: (p: { x: number; y: number }) => { x: number; y: number } } | null>(null);
+  const pendingPositionRef = useRef<{ x: number; y: number } | null>(null);
+
+  const clearSelection = useCallback(() => {
+    setSelectedNodeId(null);
+    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+    setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
+  }, [setNodes, setEdges]);
 
   const loadMindMap = useCallback(async () => {
     if (!currentBookId) return;
@@ -143,13 +153,24 @@ export function MindMapView() {
       ]);
       setChapters(chaps);
 
+      const posCount = new Map<string, number>();
+      const getOffset = (x: number, y: number) => {
+        const key = `${x},${y}`;
+        const n = posCount.get(key) ?? 0;
+        posCount.set(key, n + 1);
+        return n;
+      };
       setNodes(
-        data.nodes.map((n) => ({
-          id: n.id,
-          type: 'mindmap',
-          position: { x: n.position_x, y: n.position_y },
-          data: { label: n.label, nodeType: n.node_type, linkedChapterId: n.linked_chapter_id },
-        }))
+        data.nodes.map((n) => {
+          const dup = getOffset(n.position_x, n.position_y);
+          const offset = dup > 0 ? { x: dup * 130, y: dup * 80 } : { x: 0, y: 0 };
+          return {
+            id: n.id,
+            type: 'mindmap',
+            position: { x: n.position_x + offset.x, y: n.position_y + offset.y },
+            data: { label: n.label, nodeType: n.node_type, linkedChapterId: n.linked_chapter_id },
+          };
+        })
       );
       setEdges(
         data.edges.map((e) => ({
@@ -170,18 +191,42 @@ export function MindMapView() {
     loadMindMap();
   }, [loadMindMap]);
 
+  useEffect(() => {
+    const onMouseUp = () => { isDraggingRef.current = false; };
+    window.addEventListener('mouseup', onMouseUp);
+    return () => window.removeEventListener('mouseup', onMouseUp);
+  }, []);
+
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (mindMapRef.current && !mindMapRef.current.contains(e.target as HTMLElement)) {
+        clearSelection();
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [clearSelection]);
+
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const removedIds = new Set<string>();
       for (const c of changes) {
         if (c.type === 'remove' && 'id' in c && c.id) removedIds.add(c.id);
       }
-      if (removedIds.size > 0) {
-        setEdges((eds) => eds.filter((e) => !removedIds.has(e.source) && !removedIds.has(e.target)));
+      // Защита: при drag+delete не удалять (баг: экран чернеет)
+      const duringDrag = isDraggingRef.current;
+      const wouldRemoveAll = nodes.length > 0 && removedIds.size >= nodes.length;
+      const skipRemove = duringDrag || wouldRemoveAll;
+      const filteredChanges = skipRemove
+        ? changes.filter((c) => c.type !== 'remove')
+        : changes;
+      const effectiveRemoved = skipRemove ? new Set<string>() : removedIds;
+      if (effectiveRemoved.size > 0) {
+        setEdges((eds) => eds.filter((e) => !effectiveRemoved.has(e.source) && !effectiveRemoved.has(e.target)));
       }
-      onNodesChange(changes);
+      onNodesChange(filteredChanges);
     },
-    [onNodesChange, setEdges]
+    [onNodesChange, setEdges, nodes.length]
   );
 
   const onConnect = useCallback(
@@ -204,8 +249,13 @@ export function MindMapView() {
     }
   }, [nodes, edges, setNodes, setEdges]);
 
+  const onNodeDragStart = useCallback(() => {
+    isDraggingRef.current = true;
+  }, []);
+
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      isDraggingRef.current = false;
       setNodes((nds) =>
         nds.map((n) => (n.id === node.id ? { ...n, position: node.position } : n))
       );
@@ -283,12 +333,15 @@ export function MindMapView() {
   const addNode = useCallback(
     (type: string) => {
       const id = `node-${Date.now()}`;
+      const pos = pendingPositionRef.current;
+      pendingPositionRef.current = null;
+      const position = pos ?? { x: 150, y: 150 };
       setNodes((nds) => [
         ...nds,
         {
           id,
           type: 'mindmap',
-          position: { x: 250 + Math.random() * 150, y: 150 + Math.random() * 100 },
+          position,
           data: { label: 'Новый узел', nodeType: type },
         },
       ]);
@@ -330,7 +383,7 @@ export function MindMapView() {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div ref={mindMapRef} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <div
         style={{
           padding: '12px 20px',
@@ -342,7 +395,7 @@ export function MindMapView() {
         }}
       >
         <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          Двойной клик — переименовать. Клик по узлу — изменить тип. Перетащите между узлами — связать. Delete — удалить.
+          Клик по пустому месту → кнопка типа (Сюжет и т.д.) — узел появится там. Двойной клик — переименовать. Delete — удалить.
         </span>
         <button
           onClick={deleteSelected}
@@ -444,10 +497,20 @@ export function MindMapView() {
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDragStart={onNodeDragStart}
           onNodeDragStop={onNodeDragStop}
           onNodeClick={(_e, node) => setSelectedNodeId(node.id)}
           onEdgeClick={() => setSelectedNodeId(null)}
-          onPaneClick={() => setSelectedNodeId(null)}
+          onPaneClick={(e) => {
+            setSelectedNodeId(null);
+            if (rfInstanceRef.current) {
+              pendingPositionRef.current = rfInstanceRef.current.screenToFlowPosition({
+                x: e.clientX,
+                y: e.clientY,
+              });
+            }
+          }}
+          onInit={(inst) => { rfInstanceRef.current = inst; }}
           nodeTypes={nodeTypes}
           connectionMode={ConnectionMode.Loose}
           deleteKeyCode={['Backspace', 'Delete']}

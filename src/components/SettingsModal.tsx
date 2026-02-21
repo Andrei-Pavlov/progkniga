@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getVersion } from '@tauri-apps/api/app';
+import { invoke } from '@tauri-apps/api/core';
 import { useStore, type Theme, type AccentColor } from '../store';
 import { useUpdater } from '../hooks/useUpdater';
 
@@ -61,7 +61,7 @@ export function SettingsModal() {
   const { update, checking, downloading, error, checkForUpdates, installAndRelaunch } = useUpdater();
 
   useEffect(() => {
-    getVersion().then(setAppVersion).catch(() => {});
+    invoke<string>('get_app_version').then(setAppVersion).catch(() => {});
   }, []);
 
   if (!settingsOpen) return null;

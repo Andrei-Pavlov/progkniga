@@ -10,21 +10,25 @@ pub struct AppState {
 
 #[tauri::command]
 pub fn get_app_data_path(app_handle: tauri::AppHandle) -> Result<PathBuf, String> {
-    app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())
+    app_handle.path().app_data_dir().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_app_version(app_handle: tauri::AppHandle) -> String {
+    app_handle.package_info().version.to_string()
 }
 
 /// URL auth-service. По умолчанию localhost. Для сборки под раздачу:
 /// AUTH_SERVICE_URL=https://ваш-сервер.railway.app npm run tauri build
-const AUTH_SERVICE_URL: &str = option_env!("AUTH_SERVICE_URL").unwrap_or("http://127.0.0.1:3847");
+fn auth_service_url() -> &'static str {
+    option_env!("AUTH_SERVICE_URL").unwrap_or("http://127.0.0.1:3847")
+}
 
 #[tauri::command]
 pub async fn poll_auth_session(session_id: String) -> Result<bool, String> {
     let url = format!(
         "{}/auth/session/{}",
-        AUTH_SERVICE_URL.trim_end_matches('/'),
+        auth_service_url().trim_end_matches('/'),
         session_id.trim()
     );
     let client = reqwest::Client::new();
@@ -33,11 +37,11 @@ pub async fn poll_auth_session(session_id: String) -> Result<bool, String> {
         .send()
         .await
         .map_err(|e| format!("Auth service: {}", e))?;
-    let json: serde_json::Value = res
-        .json()
-        .await
-        .map_err(|e| format!("Parse: {}", e))?;
-    Ok(json.get("success").and_then(|v| v.as_bool()).unwrap_or(false))
+    let json: serde_json::Value = res.json().await.map_err(|e| format!("Parse: {}", e))?;
+    Ok(json
+        .get("success")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false))
 }
 
 #[tauri::command]
@@ -74,7 +78,11 @@ pub fn open_project(state: State<AppState>, path: String) -> Result<(), String> 
 }
 
 #[tauri::command]
-pub fn create_project(state: State<AppState>, path: String, title: String) -> Result<String, String> {
+pub fn create_project(
+    state: State<AppState>,
+    path: String,
+    title: String,
+) -> Result<String, String> {
     let id = Uuid::new_v4().to_string();
     crate::db_commands::create_project(&path, &id, &title)?;
     let mut db_guard = state.db.lock().expect("db lock");
@@ -112,14 +120,20 @@ pub fn update_chapter_content(
 }
 
 #[tauri::command]
-pub fn get_chapter(state: State<AppState>, chapter_id: String) -> Result<crate::db_commands::Chapter, String> {
+pub fn get_chapter(
+    state: State<AppState>,
+    chapter_id: String,
+) -> Result<crate::db_commands::Chapter, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::get_chapter(db, &chapter_id)
 }
 
 #[tauri::command]
-pub fn get_chapters(state: State<AppState>, book_id: String) -> Result<Vec<crate::db_commands::Chapter>, String> {
+pub fn get_chapters(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<Vec<crate::db_commands::Chapter>, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::get_chapters(db, &book_id)
@@ -138,7 +152,10 @@ pub fn create_character(
 }
 
 #[tauri::command]
-pub fn get_locations(state: State<AppState>, book_id: String) -> Result<Vec<crate::db_commands::Location>, String> {
+pub fn get_locations(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<Vec<crate::db_commands::Location>, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::get_locations(db, &book_id)
@@ -154,7 +171,13 @@ pub fn create_location(
 ) -> Result<String, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
-    crate::db_commands::create_location(db, &book_id, &name, parent_id.as_deref(), description.as_deref())
+    crate::db_commands::create_location(
+        db,
+        &book_id,
+        &name,
+        parent_id.as_deref(),
+        description.as_deref(),
+    )
 }
 
 #[tauri::command]
@@ -208,7 +231,10 @@ pub fn update_faction(
 }
 
 #[tauri::command]
-pub fn get_items(state: State<AppState>, book_id: String) -> Result<Vec<crate::db_commands::Item>, String> {
+pub fn get_items(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<Vec<crate::db_commands::Item>, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::get_items(db, &book_id)
@@ -227,7 +253,10 @@ pub fn create_item(
 }
 
 #[tauri::command]
-pub fn get_factions(state: State<AppState>, book_id: String) -> Result<Vec<crate::db_commands::Faction>, String> {
+pub fn get_factions(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<Vec<crate::db_commands::Faction>, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::get_factions(db, &book_id)
@@ -246,7 +275,10 @@ pub fn create_faction(
 }
 
 #[tauri::command]
-pub fn get_timeline_events(state: State<AppState>, book_id: String) -> Result<Vec<crate::db_commands::TimelineEvent>, String> {
+pub fn get_timeline_events(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<Vec<crate::db_commands::TimelineEvent>, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::get_timeline_events(db, &book_id)
@@ -262,18 +294,30 @@ pub fn create_timeline_event(
 ) -> Result<String, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
-    crate::db_commands::create_timeline_event(db, &book_id, &title, description.as_deref(), chapter_id.as_deref())
+    crate::db_commands::create_timeline_event(
+        db,
+        &book_id,
+        &title,
+        description.as_deref(),
+        chapter_id.as_deref(),
+    )
 }
 
 #[tauri::command]
-pub fn get_characters(state: State<AppState>, book_id: String) -> Result<Vec<crate::db_commands::Character>, String> {
+pub fn get_characters(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<Vec<crate::db_commands::Character>, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::get_characters(db, &book_id)
 }
 
 #[tauri::command]
-pub fn get_mindmap_data(state: State<AppState>, book_id: String) -> Result<crate::db_commands::MindMapData, String> {
+pub fn get_mindmap_data(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<crate::db_commands::MindMapData, String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::get_mindmap_data(db, &book_id)
@@ -443,7 +487,13 @@ pub fn update_lore_entry(
 ) -> Result<(), String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
-    crate::db_commands::update_lore_entry(db, &lore_id, title.as_deref(), content.as_deref(), category)
+    crate::db_commands::update_lore_entry(
+        db,
+        &lore_id,
+        title.as_deref(),
+        content.as_deref(),
+        category,
+    )
 }
 
 #[tauri::command]
@@ -500,4 +550,3 @@ pub fn save_mindmap_data(
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::save_mindmap_data(db, &book_id, &nodes, &edges)
 }
-

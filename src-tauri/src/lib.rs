@@ -9,7 +9,6 @@ mod db_commands;
 
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_app::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
@@ -19,6 +18,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_app_data_path,
+            commands::get_app_version,
             commands::poll_auth_session,
             commands::open_telegram_auth,
             commands::open_project,

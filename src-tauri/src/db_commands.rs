@@ -140,11 +140,8 @@ pub fn create_project(path: &str, id: &str, title: &str) -> Result<(), String> {
     let db_path = Path::new(path).join("storyweaver.db");
     let db = Database::new(&db_path).map_err(|e| e.to_string())?;
     let conn = db.conn();
-    conn.execute(
-        "INSERT INTO books (id, title) VALUES (?1, ?2)",
-        [id, title],
-    )
-    .map_err(|e| e.to_string())?;
+    conn.execute("INSERT INTO books (id, title) VALUES (?1, ?2)", [id, title])
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -185,7 +182,11 @@ pub fn create_chapter(state: &DbState, book_id: &str, title: &str) -> Result<Str
     Ok(id)
 }
 
-pub fn update_chapter_content(state: &DbState, chapter_id: &str, content: &str) -> Result<(), String> {
+pub fn update_chapter_content(
+    state: &DbState,
+    chapter_id: &str,
+    content: &str,
+) -> Result<(), String> {
     let conn = state.db.conn();
     conn.execute(
         "UPDATE chapters SET content = ?1, updated_at = datetime('now') WHERE id = ?2",
@@ -262,51 +263,86 @@ pub fn update_character(
 ) -> Result<(), String> {
     let conn = state.db.conn();
     if let Some(n) = name {
-        conn.execute("UPDATE characters SET name = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![n, character_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE characters SET name = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![n, character_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(d) = description {
-        conn.execute("UPDATE characters SET description = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![d, character_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE characters SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![d, character_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(alive) = is_alive {
-        conn.execute("UPDATE characters SET is_alive = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![if alive { 1 } else { 0 }, character_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE characters SET is_alive = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![if alive { 1 } else { 0 }, character_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(fid) = faction_id {
-        conn.execute("UPDATE characters SET faction_id = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![fid.as_deref(), character_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE characters SET faction_id = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![fid.as_deref(), character_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(lid) = location_id {
-        conn.execute("UPDATE characters SET location_id = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![lid.as_deref(), character_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE characters SET location_id = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![lid.as_deref(), character_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(r) = role {
-        conn.execute("UPDATE characters SET role = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![r.as_deref(), character_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE characters SET role = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![r.as_deref(), character_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 pub fn delete_chapter(state: &DbState, chapter_id: &str) -> Result<(), String> {
     let conn = state.db.conn();
-    conn.execute("UPDATE timeline_events SET chapter_id = NULL WHERE chapter_id = ?1", [chapter_id])
-        .map_err(|e| e.to_string())?;
-    conn.execute("UPDATE mindmap_nodes SET linked_chapter_id = NULL WHERE linked_chapter_id = ?1", [chapter_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE timeline_events SET chapter_id = NULL WHERE chapter_id = ?1",
+        [chapter_id],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE mindmap_nodes SET linked_chapter_id = NULL WHERE linked_chapter_id = ?1",
+        [chapter_id],
+    )
+    .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM chapters WHERE id = ?1", [chapter_id])
         .map_err(|e| e.to_string())?;
     Ok(())
 }
 
-pub fn update_chapter_order(state: &DbState, chapter_id: &str, sort_order: i32) -> Result<(), String> {
+pub fn update_chapter_order(
+    state: &DbState,
+    chapter_id: &str,
+    sort_order: i32,
+) -> Result<(), String> {
     let conn = state.db.conn();
-    conn.execute("UPDATE chapters SET sort_order = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![sort_order, chapter_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE chapters SET sort_order = ?1, updated_at = datetime('now') WHERE id = ?2",
+        rusqlite::params![sort_order, chapter_id],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
-pub fn update_chapters_order(state: &DbState, book_id: &str, chapter_ids: &[String]) -> Result<(), String> {
+pub fn update_chapters_order(
+    state: &DbState,
+    book_id: &str,
+    chapter_ids: &[String],
+) -> Result<(), String> {
     let conn = state.db.conn();
     for (idx, id) in chapter_ids.iter().enumerate() {
         conn.execute(
@@ -320,8 +356,11 @@ pub fn update_chapters_order(state: &DbState, book_id: &str, chapter_ids: &[Stri
 
 pub fn update_chapter_title(state: &DbState, chapter_id: &str, title: &str) -> Result<(), String> {
     let conn = state.db.conn();
-    conn.execute("UPDATE chapters SET title = ?1, updated_at = datetime('now') WHERE id = ?2", [title, chapter_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE chapters SET title = ?1, updated_at = datetime('now') WHERE id = ?2",
+        [title, chapter_id],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -416,7 +455,13 @@ pub fn get_locations(state: &DbState, book_id: &str) -> Result<Vec<Location>, St
     Ok(rows)
 }
 
-pub fn create_location(state: &DbState, book_id: &str, name: &str, parent_id: Option<&str>, description: Option<&str>) -> Result<String, String> {
+pub fn create_location(
+    state: &DbState,
+    book_id: &str,
+    name: &str,
+    parent_id: Option<&str>,
+    description: Option<&str>,
+) -> Result<String, String> {
     let id = Uuid::new_v4().to_string();
     let conn = state.db.conn();
     conn.execute(
@@ -427,19 +472,34 @@ pub fn create_location(state: &DbState, book_id: &str, name: &str, parent_id: Op
     Ok(id)
 }
 
-pub fn update_location(state: &DbState, location_id: &str, name: Option<&str>, description: Option<&str>, parent_id: Option<Option<String>>) -> Result<(), String> {
+pub fn update_location(
+    state: &DbState,
+    location_id: &str,
+    name: Option<&str>,
+    description: Option<&str>,
+    parent_id: Option<Option<String>>,
+) -> Result<(), String> {
     let conn = state.db.conn();
     if let Some(n) = name {
-        conn.execute("UPDATE locations SET name = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![n, location_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE locations SET name = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![n, location_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(d) = description {
-        conn.execute("UPDATE locations SET description = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![d, location_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE locations SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![d, location_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(pid) = parent_id {
-        conn.execute("UPDATE locations SET parent_id = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![pid.as_deref(), location_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE locations SET parent_id = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![pid.as_deref(), location_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -447,7 +507,9 @@ pub fn update_location(state: &DbState, location_id: &str, name: Option<&str>, d
 pub fn get_items(state: &DbState, book_id: &str) -> Result<Vec<Item>, String> {
     let conn = state.db.conn();
     let mut stmt = conn
-        .prepare("SELECT id, book_id, name, description FROM items WHERE book_id = ?1 ORDER BY name")
+        .prepare(
+            "SELECT id, book_id, name, description FROM items WHERE book_id = ?1 ORDER BY name",
+        )
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([book_id], |row| {
@@ -464,7 +526,12 @@ pub fn get_items(state: &DbState, book_id: &str) -> Result<Vec<Item>, String> {
     Ok(rows)
 }
 
-pub fn create_item(state: &DbState, book_id: &str, name: &str, description: Option<&str>) -> Result<String, String> {
+pub fn create_item(
+    state: &DbState,
+    book_id: &str,
+    name: &str,
+    description: Option<&str>,
+) -> Result<String, String> {
     let id = Uuid::new_v4().to_string();
     let conn = state.db.conn();
     conn.execute(
@@ -496,7 +563,12 @@ pub fn get_factions(state: &DbState, book_id: &str) -> Result<Vec<Faction>, Stri
     Ok(rows)
 }
 
-pub fn create_faction(state: &DbState, book_id: &str, name: &str, description: Option<&str>) -> Result<String, String> {
+pub fn create_faction(
+    state: &DbState,
+    book_id: &str,
+    name: &str,
+    description: Option<&str>,
+) -> Result<String, String> {
     let id = Uuid::new_v4().to_string();
     let conn = state.db.conn();
     conn.execute(
@@ -507,28 +579,51 @@ pub fn create_faction(state: &DbState, book_id: &str, name: &str, description: O
     Ok(id)
 }
 
-pub fn update_item(state: &DbState, item_id: &str, name: Option<&str>, description: Option<&str>) -> Result<(), String> {
+pub fn update_item(
+    state: &DbState,
+    item_id: &str,
+    name: Option<&str>,
+    description: Option<&str>,
+) -> Result<(), String> {
     let conn = state.db.conn();
     if let Some(n) = name {
-        conn.execute("UPDATE items SET name = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![n, item_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE items SET name = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![n, item_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(d) = description {
-        conn.execute("UPDATE items SET description = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![d, item_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE items SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![d, item_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
-pub fn update_faction(state: &DbState, faction_id: &str, name: Option<&str>, description: Option<&str>, leader_character_id: Option<Option<String>>) -> Result<(), String> {
+pub fn update_faction(
+    state: &DbState,
+    faction_id: &str,
+    name: Option<&str>,
+    description: Option<&str>,
+    leader_character_id: Option<Option<String>>,
+) -> Result<(), String> {
     let conn = state.db.conn();
     if let Some(n) = name {
-        conn.execute("UPDATE factions SET name = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![n, faction_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE factions SET name = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![n, faction_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(d) = description {
-        conn.execute("UPDATE factions SET description = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![d, faction_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE factions SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![d, faction_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(lid) = leader_character_id {
         conn.execute("UPDATE factions SET leader_character_id = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![lid.as_deref(), faction_id])
@@ -559,11 +654,21 @@ pub fn get_timeline_events(state: &DbState, book_id: &str) -> Result<Vec<Timelin
     Ok(rows)
 }
 
-pub fn create_timeline_event(state: &DbState, book_id: &str, title: &str, description: Option<&str>, chapter_id: Option<&str>) -> Result<String, String> {
+pub fn create_timeline_event(
+    state: &DbState,
+    book_id: &str,
+    title: &str,
+    description: Option<&str>,
+    chapter_id: Option<&str>,
+) -> Result<String, String> {
     let id = Uuid::new_v4().to_string();
     let conn = state.db.conn();
     let max_order: i32 = conn
-        .query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM timeline_events WHERE book_id = ?1", [book_id], |row| row.get(0))
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM timeline_events WHERE book_id = ?1",
+            [book_id],
+            |row| row.get(0),
+        )
         .unwrap_or(1);
     conn.execute(
         "INSERT INTO timeline_events (id, book_id, title, description, chapter_id, sort_order) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -583,8 +688,11 @@ pub fn update_timeline_event(
 ) -> Result<(), String> {
     let conn = state.db.conn();
     if let Some(t) = title {
-        conn.execute("UPDATE timeline_events SET title = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![t, event_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE timeline_events SET title = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![t, event_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(d) = description {
         conn.execute("UPDATE timeline_events SET description = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![d, event_id])
@@ -617,8 +725,11 @@ pub fn delete_character(state: &DbState, character_id: &str) -> Result<(), Strin
 
 pub fn delete_location(state: &DbState, location_id: &str) -> Result<(), String> {
     let conn = state.db.conn();
-    conn.execute("UPDATE locations SET parent_id = NULL WHERE parent_id = ?1", [location_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE locations SET parent_id = NULL WHERE parent_id = ?1",
+        [location_id],
+    )
+    .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM locations WHERE id = ?1", [location_id])
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -633,10 +744,16 @@ pub fn delete_item(state: &DbState, item_id: &str) -> Result<(), String> {
 
 pub fn delete_faction(state: &DbState, faction_id: &str) -> Result<(), String> {
     let conn = state.db.conn();
-    conn.execute("UPDATE characters SET faction_id = NULL WHERE faction_id = ?1", [faction_id])
-        .map_err(|e| e.to_string())?;
-    conn.execute("UPDATE factions SET leader_character_id = NULL WHERE id = ?1", [faction_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE characters SET faction_id = NULL WHERE faction_id = ?1",
+        [faction_id],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE factions SET leader_character_id = NULL WHERE id = ?1",
+        [faction_id],
+    )
+    .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM factions WHERE id = ?1", [faction_id])
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -651,43 +768,59 @@ pub struct LoreEntry {
     pub category: Option<String>,
 }
 
-pub fn get_lore_entries(state: &DbState, book_id: &str, category: Option<&str>) -> Result<Vec<LoreEntry>, String> {
+pub fn get_lore_entries(
+    state: &DbState,
+    book_id: &str,
+    category: Option<&str>,
+) -> Result<Vec<LoreEntry>, String> {
     let conn = state.db.conn();
     let rows: Vec<LoreEntry> = if let Some(cat) = category {
         let mut stmt = conn
             .prepare("SELECT id, book_id, title, content, category FROM lore_entries WHERE book_id = ?1 AND category = ?2 ORDER BY title")
             .map_err(|e| e.to_string())?;
-        let mapped = stmt.query_map(rusqlite::params![book_id, cat], |row| {
-            Ok(LoreEntry {
-                id: row.get(0)?,
-                book_id: row.get(1)?,
-                title: row.get(2)?,
-                content: row.get(3)?,
-                category: row.get(4)?,
+        let mapped = stmt
+            .query_map(rusqlite::params![book_id, cat], |row| {
+                Ok(LoreEntry {
+                    id: row.get(0)?,
+                    book_id: row.get(1)?,
+                    title: row.get(2)?,
+                    content: row.get(3)?,
+                    category: row.get(4)?,
+                })
             })
-        }).map_err(|e| e.to_string())?;
-        mapped.collect::<Result<Vec<_>, rusqlite::Error>>()
+            .map_err(|e| e.to_string())?;
+        mapped
+            .collect::<Result<Vec<_>, rusqlite::Error>>()
             .map_err(|e| e.to_string())?
     } else {
         let mut stmt = conn
             .prepare("SELECT id, book_id, title, content, category FROM lore_entries WHERE book_id = ?1 ORDER BY category, title")
             .map_err(|e| e.to_string())?;
-        let mapped = stmt.query_map([book_id], |row| {
-            Ok(LoreEntry {
-                id: row.get(0)?,
-                book_id: row.get(1)?,
-                title: row.get(2)?,
-                content: row.get(3)?,
-                category: row.get(4)?,
+        let mapped = stmt
+            .query_map([book_id], |row| {
+                Ok(LoreEntry {
+                    id: row.get(0)?,
+                    book_id: row.get(1)?,
+                    title: row.get(2)?,
+                    content: row.get(3)?,
+                    category: row.get(4)?,
+                })
             })
-        }).map_err(|e| e.to_string())?;
-        mapped.collect::<Result<Vec<_>, rusqlite::Error>>()
+            .map_err(|e| e.to_string())?;
+        mapped
+            .collect::<Result<Vec<_>, rusqlite::Error>>()
             .map_err(|e| e.to_string())?
     };
     Ok(rows)
 }
 
-pub fn create_lore_entry(state: &DbState, book_id: &str, title: &str, content: &str, category: Option<&str>) -> Result<String, String> {
+pub fn create_lore_entry(
+    state: &DbState,
+    book_id: &str,
+    title: &str,
+    content: &str,
+    category: Option<&str>,
+) -> Result<String, String> {
     let id = Uuid::new_v4().to_string();
     let conn = state.db.conn();
     conn.execute(
@@ -698,19 +831,34 @@ pub fn create_lore_entry(state: &DbState, book_id: &str, title: &str, content: &
     Ok(id)
 }
 
-pub fn update_lore_entry(state: &DbState, lore_id: &str, title: Option<&str>, content: Option<&str>, category: Option<Option<String>>) -> Result<(), String> {
+pub fn update_lore_entry(
+    state: &DbState,
+    lore_id: &str,
+    title: Option<&str>,
+    content: Option<&str>,
+    category: Option<Option<String>>,
+) -> Result<(), String> {
     let conn = state.db.conn();
     if let Some(t) = title {
-        conn.execute("UPDATE lore_entries SET title = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![t, lore_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE lore_entries SET title = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![t, lore_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(c) = content {
-        conn.execute("UPDATE lore_entries SET content = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![c, lore_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE lore_entries SET content = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![c, lore_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(cat) = category {
-        conn.execute("UPDATE lore_entries SET category = ?1, updated_at = datetime('now') WHERE id = ?2", rusqlite::params![cat.as_deref(), lore_id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE lore_entries SET category = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![cat.as_deref(), lore_id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -728,7 +876,12 @@ pub struct EntityAppearance {
     pub chapter_title: String,
 }
 
-pub fn get_entity_appearances(state: &DbState, book_id: &str, entity_type: &str, entity_id: &str) -> Result<Vec<EntityAppearance>, String> {
+pub fn get_entity_appearances(
+    state: &DbState,
+    book_id: &str,
+    entity_type: &str,
+    entity_id: &str,
+) -> Result<Vec<EntityAppearance>, String> {
     let conn = state.db.conn();
     let mut stmt = conn
         .prepare(
@@ -751,7 +904,12 @@ pub fn get_entity_appearances(state: &DbState, book_id: &str, entity_type: &str,
     Ok(rows)
 }
 
-pub fn add_entity_appearance(state: &DbState, entity_type: &str, entity_id: &str, chapter_id: &str) -> Result<(), String> {
+pub fn add_entity_appearance(
+    state: &DbState,
+    entity_type: &str,
+    entity_id: &str,
+    chapter_id: &str,
+) -> Result<(), String> {
     let id = Uuid::new_v4().to_string();
     let conn = state.db.conn();
     conn.execute(
@@ -762,7 +920,12 @@ pub fn add_entity_appearance(state: &DbState, entity_type: &str, entity_id: &str
     Ok(())
 }
 
-pub fn remove_entity_appearance(state: &DbState, entity_type: &str, entity_id: &str, chapter_id: &str) -> Result<(), String> {
+pub fn remove_entity_appearance(
+    state: &DbState,
+    entity_type: &str,
+    entity_id: &str,
+    chapter_id: &str,
+) -> Result<(), String> {
     let conn = state.db.conn();
     conn.execute(
         "DELETE FROM entity_appearances WHERE entity_type = ?1 AND entity_id = ?2 AND chapter_id = ?3",
