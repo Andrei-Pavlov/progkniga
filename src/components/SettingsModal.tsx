@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getVersion } from '@tauri-apps/api/app';
 import { useStore, type Theme, type AccentColor } from '../store';
+import { useUpdater } from '../hooks/useUpdater';
 
 const FONT_OPTIONS = [
   { value: 'Georgia, serif', label: 'Georgia' },
@@ -32,7 +34,7 @@ const TEXT_WIDTH_OPTIONS = [
   { value: 900, label: '900px' },
 ];
 
-type Tab = 'editor' | 'appearance';
+type Tab = 'editor' | 'appearance' | 'about';
 
 export function SettingsModal() {
   const settingsOpen = useStore((s) => s.settingsOpen);
@@ -55,6 +57,12 @@ export function SettingsModal() {
   const setFocusMode = useStore((s) => s.setFocusMode);
 
   const [tab, setTab] = useState<Tab>('editor');
+  const [appVersion, setAppVersion] = useState('1.0.0');
+  const { update, checking, downloading, error, checkForUpdates, installAndRelaunch } = useUpdater();
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
 
   if (!settingsOpen) return null;
 
@@ -103,7 +111,7 @@ export function SettingsModal() {
         <h2 style={{ margin: '0 0 20px 0', fontSize: 18 }}>Настройки</h2>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          {(['editor', 'appearance'] as const).map((t) => (
+          {(['editor', 'appearance', 'about'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -117,7 +125,7 @@ export function SettingsModal() {
                 cursor: 'pointer',
               }}
             >
-              {t === 'editor' ? 'Редактор' : 'Внешний вид'}
+              {t === 'editor' ? 'Редактор' : t === 'appearance' ? 'Внешний вид' : 'О приложении'}
             </button>
           ))}
         </div>
@@ -208,6 +216,56 @@ export function SettingsModal() {
                 ))}
               </select>
             </div>
+          </div>
+        )}
+
+        {tab === 'about' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+              {`StoryWeaver v${appVersion}`}
+            </p>
+            {error && (
+              <p style={{ fontSize: 13, color: 'var(--accent)', margin: 0 }}>{error}</p>
+            )}
+            {update ? (
+              <div>
+                <p style={{ fontSize: 14, marginBottom: 12 }}>
+                  Доступна версия {update.version}
+                  {update.body && ` — ${update.body}`}
+                </p>
+                <button
+                  onClick={installAndRelaunch}
+                  disabled={downloading}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: 14,
+                    background: 'var(--accent)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: downloading ? 'wait' : 'pointer',
+                  }}
+                >
+                  {downloading ? 'Загрузка...' : 'Установить и перезапустить'}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => checkForUpdates()}
+                disabled={checking}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: 14,
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 6,
+                  cursor: checking ? 'wait' : 'pointer',
+                }}
+              >
+                {checking ? 'Проверка...' : 'Проверить обновления'}
+              </button>
+            )}
           </div>
         )}
 

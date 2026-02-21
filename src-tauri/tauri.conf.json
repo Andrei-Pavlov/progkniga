@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -49,5 +50,10 @@
     },
     "resources": []
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY2RERGMzczNkE4RkJDQzUKUldURnZJOXFjL1BkOXE2a0dwbkN6ZjZTUGpMRDRaS0x6Y3pHOVd3MHZpTkU4VTNJSEtWdW5XRC8K",
+      "endpoints": ["https://github.com/Andrei-Pavlov/progkniga/releases/latest/download/latest.json"]
+    }
+  }
 }

@@ -26,3 +26,8 @@ npm-debug.log*
 
 # Auth service runtime data (содержит ID подписчиков)
 auth-service/subscriptions.json
+
+# Tauri updater signing keys (приватный ключ!)
+.tauri/*.key
+storyweaver.key
+storyweaver.key.pub
