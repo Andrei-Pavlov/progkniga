@@ -9,6 +9,7 @@ const TELEGRAM_CHANNEL = 'WeaverStory';
 export function LoginScreen() {
   const setAuthenticated = useStore((s) => s.setAuthenticated);
   const [loading, setLoading] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
   const [error, setError] = useState('');
   const [showQr, setShowQr] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -17,6 +18,7 @@ export function LoginScreen() {
   const doneRef = useRef(false);
 
   useEffect(() => {
+    invoke<string>('get_app_version').then(setAppVersion).catch(() => {});
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
@@ -131,6 +133,20 @@ export function LoginScreen() {
       <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: 12, textAlign: 'center', maxWidth: 320 }}>
         Подпишитесь на t.me/{TELEGRAM_CHANNEL} через Tribute. Вход проверяет подписку автоматически.
       </p>
+
+      {appVersion && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 12,
+            right: 16,
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+          }}
+        >
+          v{appVersion}
+        </div>
+      )}
 
       {showQr && qrDataUrl && (
         <div

@@ -37,14 +37,28 @@ npx tauri signer generate -- -w ~/.tauri/storyweaver.key
 
 ## Локальная сборка с подписью
 
-```bash
-# Windows
-$env:TAURI_SIGNING_PRIVATE_KEY = "путь/к/storyweaver.key"
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "ваш_пароль"
-npm run tauri build
+**Важно:** Tauri **не читает** `.env` для ключей подписи — только переменные окружения в shell.
 
-# macOS / Linux
+### Вариант 1: Скрипт (рекомендуется)
+
+```powershell
+npm run tauri:build:signed
+```
+
+### Вариант 2: Вручную в PowerShell
+
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY = "$PWD\storyweaver.key"
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "kuku22kuku"
+$env:AUTH_SERVICE_URL = "https://progkniga-production.up.railway.app"
+npm run tauri build
+```
+
+### macOS / Linux
+
+```bash
 export TAURI_SIGNING_PRIVATE_KEY="путь/к/storyweaver.key"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="ваш_пароль"
+export AUTH_SERVICE_URL="https://progkniga-production.up.railway.app"
 npm run tauri build
 ```
