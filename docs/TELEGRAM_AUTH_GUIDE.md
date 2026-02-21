@@ -31,9 +31,10 @@
 ## Часть 2: Канал и Tribute
 
 1. Создайте канал **t.me/WeaverStory** (или используйте существующий).
-2. Подключите [@tribute](https://t.me/tribute) к каналу.
-3. Настройте подписку.
-4. Creator Dashboard → Settings (⋯) → **API Keys**:
+2. **Добавьте бота StoWeaBot в канал как администратора** — это нужно для автоматической проверки подписки (если webhook Tribute не сработал).
+3. Подключите [@tribute](https://t.me/tribute) к каналу.
+4. Настройте подписку.
+5. Creator Dashboard → Settings (⋯) → **API Keys**:
    - Сгенерируйте API Key, если нет
    - **Webhook URL**: `https://ваш-ngrok-url.ngrok-free.app/webhook/tribute`  
      (без слэша в конце, HTTPS обязателен)
@@ -49,9 +50,12 @@ TRIBUTE_API_KEY=ваш_ключ_tribute
 TRIBUTE_API_URL=https://tribute.tg/api/v1
 TELEGRAM_BOT_TOKEN=ваш_токен_от_BotFather
 AUTH_BASE_URL=https://ваш-ngrok-url.ngrok-free.app
+TELEGRAM_CHANNEL=WeaverStory
 ```
 
 **AUTH_BASE_URL** — публичный URL (ngrok или ваш домен). Tribute webhook и Mini App должны быть доступны по HTTPS.
+
+**TELEGRAM_CHANNEL** — username канала для fallback-проверки (бот должен быть админом).
 
 ### Запуск
 
@@ -84,9 +88,12 @@ npm run tauri:dev
 
 1. Подпишитесь на канал t.me/WeaverStory через Tribute.
 2. В приложении нажмите «Войти через Telegram».
-3. Откроется бот — нажмите кнопку «Войти в StoryWeaver».
-4. Mini App проверит подписку и завершит вход.
-5. Вернитесь в приложение — доступ будет открыт.
+3. Появится QR-код — отсканируйте камерой телефона (Telegram откроет бота) или нажмите «Открыть в браузере».
+4. В боте нажмите кнопку «Войти в StoryWeaver».
+5. Mini App проверит подписку и завершит вход.
+6. Вернитесь в приложение — доступ будет открыт.
+
+**Без Telegram на компьютере:** используйте QR-код — отсканируйте телефоном и войдите через Telegram на телефоне.
 
 ---
 
@@ -106,13 +113,16 @@ npm run tauri:dev
 
 ## Если «Нет активной подписки»
 
-**Railway:** Без Volume и `DATA_DIR=/data` список подписчиков сбрасывается при каждом деплое. Добавьте Volume и переменную.
+**Автоматическая проверка (продакшен):**
+1. **Webhook Tribute** — при подписке Tribute отправляет событие, мы добавляем пользователя.
+2. **Fallback через канал** — если webhook не сработал, при входе проверяем членство в канале через Telegram API. **Бот StoWeaBot должен быть администратором канала.**
 
-**Webhook Tribute** может не срабатывать. Временно добавьте себя вручную:
+**Проверьте:**
+- Tribute Creator Dashboard → Webhook URL = `https://ваш-url/webhook/tribute`
+- Бот StoWeaBot добавлен в канал как администратор
+- **Railway:** Volume примонтирован к `/data`, `DATA_DIR=/data` — иначе подписчики сбрасываются при деплое
 
-1. Узнайте свой Telegram ID: напишите боту [@userinfobot](https://t.me/userinfobot).
-2. Откройте: `https://ваш-auth-url/auth/add?telegram_id=ВАШ_ID` (или `http://localhost:3847/auth/add?telegram_id=ВАШ_ID` для локального запуска)
-3. После этого войдите через бота как обычно.
+**Отладка (только localhost):** `http://localhost:3847/auth/add?telegram_id=ВАШ_ID`
 
 ---
 

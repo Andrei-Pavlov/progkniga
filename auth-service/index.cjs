@@ -20,6 +20,8 @@ const TRIBUTE_API = process.env.TRIBUTE_API_URL || 'https://tribute.tg/api/v1';
 const TRIBUTE_API_KEY = process.env.TRIBUTE_API_KEY || '';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const AUTH_BASE_URL = (process.env.AUTH_BASE_URL || '').replace(/\/$/, '');
+// Канал для проверки подписки (@WeaverStory). Бот должен быть админом канала.
+const TELEGRAM_CHANNEL = (process.env.TELEGRAM_CHANNEL || 'WeaverStory').replace(/^@?/, '@');
 // Railway: примонтируйте Volume к /data, задайте DATA_DIR=/data — иначе subscriptions сбрасываются при каждом деплое
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 const SUBS_FILE = path.join(DATA_DIR, 'subscriptions.json');
@@ -90,6 +92,21 @@ async function sendTelegramMessage(chatId, text, replyMarkup) {
     body: JSON.stringify(body),
   });
   return r.json().catch(() => ({}));
+}
+
+// Проверка подписки через Telegram API (бот должен быть админом канала)
+async function checkChannelMembership(telegramId) {
+  if (!BOT_TOKEN || !TELEGRAM_CHANNEL) return false;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${encodeURIComponent(TELEGRAM_CHANNEL)}&user_id=${telegramId}`);
+    const d = await r.json();
+    if (!d.ok) return false;
+    const status = (d.result?.status || '').toLowerCase();
+    return ['creator', 'administrator', 'member', 'restricted'].includes(status);
+  } catch (e) {
+    console.log('[Auth] getChatMember error:', e.message);
+    return false;
+  }
 }
 
 const MINI_APP_HTML = (sessionId, baseUrl) => `<!DOCTYPE html>
@@ -191,14 +208,23 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ success: false, error: 'Неверные данные' }));
         return;
       }
-      const sub = subscriptions.get(telegramId);
+      let sub = subscriptions.get(telegramId);
       if (!sub?.active) {
-        console.log('[Verify] tgId:', telegramId, '→ Нет подписки (subscriptions:', subscriptions.size, 'записей)');
-        res.writeHead(200);
-        res.end(JSON.stringify({ success: false, error: 'Нет активной подписки на канал' }));
-        return;
+        // Fallback: проверка через Telegram API (если webhook Tribute не сработал)
+        const inChannel = await checkChannelMembership(telegramId);
+        if (inChannel) {
+          subscriptions.set(telegramId, { active: true, expiresAt: null });
+          saveSubscriptions();
+          console.log('[Verify] tgId:', telegramId, '→ OK (подтверждено через канал)');
+        } else {
+          console.log('[Verify] tgId:', telegramId, '→ Нет подписки (subscriptions:', subscriptions.size, 'записей)');
+          res.writeHead(200);
+          res.end(JSON.stringify({ success: false, error: 'Нет активной подписки на канал' }));
+          return;
+        }
+      } else {
+        console.log('[Verify] tgId:', telegramId, '→ OK, подписка активна');
       }
-      console.log('[Verify] tgId:', telegramId, '→ OK, подписка активна');
       if (sessionId) {
         sessions.set(sessionId, { telegramId, done: true, expiresAt: Date.now() + 60000 });
       }
@@ -211,8 +237,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Ручное добавление подписчика (только localhost, для теста)
+  // Ручное добавление — только localhost (для отладки; в проде всё через webhook/канал)
   if (url.pathname === '/auth/add' && req.method === 'GET') {
+    const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
+    const remote = forwarded || req.socket?.remoteAddress || '';
+    const isLocal = /^(127\.|::1|localhost)/.test(remote) || remote === '';
+    if (!isLocal) {
+      res.writeHead(403);
+      res.end(JSON.stringify({ error: 'Only localhost' }));
+      return;
+    }
     const telegramId = url.searchParams.get('telegram_id');
     if (telegramId) {
       subscriptions.set(String(telegramId).trim(), { active: true, expiresAt: null });
@@ -224,8 +258,17 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Ручное удаление подписчика (для теста webhook Tribute)
+  // Ручное удаление подписчика — только localhost (для теста)
   if (url.pathname === '/auth/remove' && req.method === 'GET') {
+    const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
+    const remote = forwarded || req.socket?.remoteAddress || '';
+    const isLocal = /^(127\.|::1|localhost)/.test(remote) || remote === '';
+    if (!isLocal) {
+      console.log('[Auth] /auth/remove rejected (not localhost):', remote);
+      res.writeHead(403);
+      res.end(JSON.stringify({ error: 'Only localhost' }));
+      return;
+    }
     const telegramId = url.searchParams.get('telegram_id');
     if (telegramId) {
       const id = String(telegramId).trim();
@@ -319,14 +362,21 @@ const server = http.createServer(async (req, res) => {
         }
         // Tribute оборачивает: { name, payload, created_at, sent_at }
         const payload = raw.payload || raw;
-        const event = raw.name || payload.event || payload.type;
-        const tgId = String(getTelegramId(payload) || getTelegramId(raw) || '');
+        const event = (raw.name || payload.event || payload.type || '').toString();
+
+        // Ищем telegram_id в разных форматах (Tribute меняет структуру)
+        let tgId = getTelegramId(payload) || getTelegramId(raw);
+        if (!tgId && payload.subscription) tgId = getTelegramId(payload.subscription);
+        if (!tgId && raw.data) tgId = getTelegramId(raw.data);
+        tgId = tgId ? String(tgId) : '';
+
         console.log('[Tribute] event:', event, 'tgId:', tgId || '(not found)');
         if (!tgId) {
-          console.log('[Tribute] RAW (для отладки):', JSON.stringify(raw));
+          console.log('[Tribute] RAW (для отладки):', JSON.stringify(raw).slice(0, 500));
         }
-        const isNew = ['newSubscription', 'renewedSubscription', 'new_subscription', 'renewed_subscription'].includes(event);
-        const isCancel = ['cancelledSubscription', 'cancelled_subscription'].includes(event);
+
+        const isNew = ['newSubscription', 'renewedSubscription', 'new_subscription', 'renewed_subscription', 'subscription_created', 'subscription_renewed'].includes(event);
+        const isCancel = ['cancelledSubscription', 'cancelled_subscription', 'subscription_cancelled'].includes(event);
         if (tgId) {
           if (isNew) {
             const exp = payload.expires_at ?? payload.expiresAt ?? raw.expires_at ?? raw.expiresAt;
@@ -363,6 +413,7 @@ server.listen(PORT, '0.0.0.0', async () => {
   console.log(`StoryWeaver Auth Service on port ${PORT}`);
   console.log('[Config] subscriptions:', SUBS_FILE, '(', subscriptions.size, 'записей)');
   console.log('[Config] AUTH_BASE_URL:', AUTH_BASE_URL || '(not set)');
+  console.log('[Config] TELEGRAM_CHANNEL:', TELEGRAM_CHANNEL, '(fallback проверка подписки)');
   if (BOT_TOKEN && AUTH_BASE_URL) {
     const webhookUrl = AUTH_BASE_URL + '/bot/webhook';
     try {
