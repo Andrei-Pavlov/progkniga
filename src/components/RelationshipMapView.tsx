@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useStore } from '../store';
-import { MapCanvas, useMapCanvas } from './MapCanvas';
+import ForceGraph2D from 'react-force-graph-2d';
 
 const RELATIONSHIP_TYPES = [
   'Друг',
@@ -79,204 +79,24 @@ interface Relationship {
   description_b_to_a?: string | null;
 }
 
-const NODE_SIZE = 72;
-const SAVE_DEBOUNCE = 500;
+const NODE_R = 36;
 
-function DraggableCharacterNode({
-  char,
-  pos,
-  factionName,
-  locationName,
-  dragging,
-  onDragStart,
-  onDragMove,
-  onDragEnd,
-  onAddAvatar,
-  onNodeClick,
-  connectMode,
-  isConnectSource,
-}: {
-  char: Character;
-  pos: { x: number; y: number };
-  factionName?: string;
-  locationName?: string;
-  dragging: boolean;
-  onDragStart: (e: React.MouseEvent, id: string, offsetX: number, offsetY: number) => void;
-  onDragMove: (id: string, x: number, y: number) => void;
-  onDragEnd: (id: string) => void;
-  onAddAvatar: (characterId: string) => void;
-  onNodeClick: (id: string) => void;
-  connectMode: boolean;
-  isConnectSource: boolean;
-}) {
-  const ctx = useMapCanvas();
-  const dragStartRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
-  const [showTooltip, setShowTooltip] = useState(false);
-  const hasInfo = char.description || factionName || locationName || char.role;
+interface GraphNode {
+  id: string;
+  name: string;
+  avatar_url?: string | null;
+  character: Character;
+  x?: number;
+  y?: number;
+  fx?: number;
+  fy?: number;
+}
 
-  useEffect(() => {
-    if (!ctx || !dragging) return;
-    const handler = (e: MouseEvent) => {
-      if (dragStartRef.current) {
-        const { x, y } = ctx.screenToCanvas(e.clientX, e.clientY);
-        onDragMove(char.id, x - dragStartRef.current.offsetX, y - dragStartRef.current.offsetY);
-      }
-    };
-    window.addEventListener('mousemove', handler);
-    return () => window.removeEventListener('mousemove', handler);
-  }, [ctx, dragging, char.id, onDragMove]);
-
-  useEffect(() => {
-    if (!dragging) return;
-    const handler = () => {
-      onDragEnd(char.id);
-      dragStartRef.current = null;
-    };
-    window.addEventListener('mouseup', handler);
-    return () => window.removeEventListener('mouseup', handler);
-  }, [dragging, char.id, onDragEnd]);
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (!ctx) return;
-      if (connectMode) {
-        onNodeClick(char.id);
-        return;
-      }
-      const { x, y } = ctx.screenToCanvas(e.clientX, e.clientY);
-      const offsetX = x - pos.x;
-      const offsetY = y - pos.y;
-      dragStartRef.current = { offsetX, offsetY };
-      onDragStart(e, char.id, offsetX, offsetY);
-    },
-    [ctx, char.id, pos, onDragStart, onNodeClick, connectMode]
-  );
-
-  return (
-    <div
-      onMouseDown={handleMouseDown}
-      onMouseEnter={() => setShowTooltip(!!hasInfo)}
-      onMouseLeave={() => setShowTooltip(false)}
-      style={{
-        position: 'absolute',
-        left: pos.x,
-        top: pos.y,
-        transform: 'translate(-50%, -50%)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        cursor: connectMode ? 'pointer' : dragging ? 'grabbing' : 'grab',
-        userSelect: 'none',
-      }}
-    >
-      <div
-        style={{
-          position: 'relative',
-          width: NODE_SIZE,
-          height: NODE_SIZE,
-          borderRadius: '50%',
-          overflow: 'hidden',
-          background: 'var(--bg-tertiary)',
-          border: isConnectSource ? '4px solid var(--accent)' : '3px solid var(--accent)',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.25)',
-          flexShrink: 0,
-        }}
-      >
-        {char.avatar_url ? (
-          <img
-            src={char.avatar_url}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : (
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-secondary)',
-              fontSize: 24,
-              fontWeight: 600,
-            }}
-          >
-            {char.name.charAt(0).toUpperCase()}
-          </div>
-        )}
-        {!connectMode && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddAvatar(char.id);
-            }}
-            title="Добавить аватар"
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              right: 0,
-              width: 24,
-              height: 24,
-              borderRadius: '50%',
-              background: 'var(--accent)',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 12,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 0,
-            }}
-          >
-            +
-          </button>
-        )}
-      </div>
-      <div
-        style={{
-          marginTop: 6,
-          fontSize: 12,
-          fontWeight: 600,
-          color: 'var(--text-primary)',
-          textAlign: 'center',
-          maxWidth: 100,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {char.name}
-      </div>
-      {showTooltip && hasInfo && (
-        <div
-          style={{
-            position: 'absolute',
-            zIndex: 1000,
-            top: '100%',
-            marginTop: 4,
-            padding: 10,
-            background: 'var(--bg-tertiary)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            fontSize: 12,
-            color: 'var(--text-primary)',
-            maxWidth: 220,
-            whiteSpace: 'pre-wrap',
-          }}
-        >
-          {char.description && <div style={{ marginBottom: 6 }}>{char.description}</div>}
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-            {factionName && <div>Фракция: {factionName}</div>}
-            {locationName && <div>Локация: {locationName}</div>}
-            {char.role && <div>Роль: {ROLE_LABELS[char.role] || char.role}</div>}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+interface GraphLink {
+  id: string;
+  source: string;
+  target: string;
+  relationship: Relationship;
 }
 
 export function RelationshipMapView() {
@@ -286,7 +106,6 @@ export function RelationshipMapView() {
   const [factions, setFactions] = useState<{ id: string; name: string }[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dragging, setDragging] = useState<string | null>(null);
   const [selectedRelId, setSelectedRelId] = useState<string | null>(null);
   const [connectMode, setConnectMode] = useState(false);
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
@@ -294,7 +113,8 @@ export function RelationshipMapView() {
   const [editTypeB2A, setEditTypeB2A] = useState('');
   const [editDescA2B, setEditDescA2B] = useState('');
   const [editDescB2A, setEditDescB2A] = useState('');
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const imgCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  const [, forceUpdate] = useState(0);
 
   const loadData = useCallback(async () => {
     if (!currentBookId) return;
@@ -321,27 +141,30 @@ export function RelationshipMapView() {
     loadData();
   }, [loadData]);
 
-  const factionMap = new Map(factions.map((f) => [f.id, f.name]));
-  const locationMap = new Map(locations.map((l) => [l.id, l.name]));
+  const factionMap = useMemo(() => new Map(factions.map((f) => [f.id, f.name])), [factions]);
+  const locationMap = useMemo(() => new Map(locations.map((l) => [l.id, l.name])), [locations]);
 
-  const getPos = useCallback(
-    (char: Character) => {
-      const idx = characters.indexOf(char);
-      const defaultX = 200 + (idx % 5) * 180;
-      const defaultY = 200 + Math.floor(idx / 5) * 140;
+  const graphData = useMemo(() => {
+    const nodes: GraphNode[] = characters.map((c, idx) => {
+      const hasPos = c.map_x != null && c.map_y != null;
+      const defaultX = (idx % 5) * 200 - 400;
+      const defaultY = Math.floor(idx / 5) * 150 - 200;
       return {
-        x: char.map_x ?? defaultX,
-        y: char.map_y ?? defaultY,
+        id: c.id,
+        name: c.name,
+        avatar_url: c.avatar_url,
+        character: c,
+        ...(hasPos ? { x: c.map_x!, y: c.map_y!, fx: c.map_x!, fy: c.map_y! } : { x: defaultX, y: defaultY }),
       };
-    },
-    [characters]
-  );
-
-  const posMap = useMemo(() => {
-    const m = new Map<string, { x: number; y: number }>();
-    characters.forEach((c) => m.set(c.id, getPos(c)));
-    return m;
-  }, [characters, getPos]);
+    });
+    const links: GraphLink[] = relationships.map((r) => ({
+      id: r.id,
+      source: r.character_a_id,
+      target: r.character_b_id,
+      relationship: r,
+    }));
+    return { nodes, links };
+  }, [characters, relationships]);
 
   const savePosition = useCallback(
     async (characterId: string, x: number, y: number) => {
@@ -351,44 +174,14 @@ export function RelationshipMapView() {
           map_x: x,
           map_y: y,
         });
+        setCharacters((prev) =>
+          prev.map((c) => (c.id === characterId ? { ...c, map_x: x, map_y: y } : c))
+        );
       } catch (e) {
         console.error(e);
       }
     },
     []
-  );
-
-  const handleDragStart = useCallback((_e: React.MouseEvent, id: string, _ox: number, _oy: number) => {
-    setDragging(id);
-  }, []);
-
-  const handleDragMove = useCallback(
-    (id: string, x: number, y: number) => {
-      setCharacters((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, map_x: x, map_y: y } : c))
-      );
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        savePosition(id, x, y);
-        saveTimerRef.current = null;
-      }, SAVE_DEBOUNCE);
-    },
-    [savePosition]
-  );
-
-  const handleDragEnd = useCallback(
-    (id: string) => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-        const char = characters.find((c) => c.id === id);
-        if (char && char.map_x != null && char.map_y != null) {
-          savePosition(id, char.map_x, char.map_y);
-        }
-        saveTimerRef.current = null;
-      }
-      setDragging(null);
-    },
-    [characters, savePosition]
   );
 
   const handleAddAvatar = useCallback(async (characterId: string) => {
@@ -409,79 +202,91 @@ export function RelationshipMapView() {
     }
   }, []);
 
-  const handleNodeClickInConnectMode = useCallback(
-    async (id: string) => {
-      if (!connectSourceId) {
-        setConnectSourceId(id);
-        return;
-      }
-      if (connectSourceId === id) {
-        setConnectSourceId(null);
-        return;
-      }
-      const exists = relationships.some(
-        (r) =>
-          (r.character_a_id === connectSourceId && r.character_b_id === id) ||
-          (r.character_a_id === id && r.character_b_id === connectSourceId)
-      );
-      if (exists) {
-        setConnectSourceId(null);
-        setConnectMode(false);
-        return;
-      }
-      try {
-        const relId = await invoke<string>('create_character_relationship', {
+  const handleNodeClick = useCallback(
+    (node: GraphNode) => {
+      if (connectMode) {
+        if (!connectSourceId) {
+          setConnectSourceId(node.id);
+          return;
+        }
+        if (connectSourceId === node.id) {
+          setConnectSourceId(null);
+          return;
+        }
+        const exists = relationships.some(
+          (r) =>
+            (r.character_a_id === connectSourceId && r.character_b_id === node.id) ||
+            (r.character_a_id === node.id && r.character_b_id === connectSourceId)
+        );
+        if (exists) {
+          setConnectSourceId(null);
+          setConnectMode(false);
+          return;
+        }
+        invoke<string>('create_character_relationship', {
           bookId: currentBookId,
           characterAId: connectSourceId,
-          characterBId: id,
+          characterBId: node.id,
           relationshipType: null,
           description: null,
-        });
-        setRelationships((prev) => [
-          ...prev,
-          {
-            id: relId,
-            character_a_id: connectSourceId,
-            character_b_id: id,
-            relationship_type: null,
-            description: null,
-            relationship_type_a_to_b: null,
-            relationship_type_b_to_a: null,
-            description_a_to_b: null,
-            description_b_to_a: null,
-          },
-        ]);
-      } catch (e) {
-        console.error(e);
+        })
+          .then((relId) => {
+            setRelationships((prev) => [
+              ...prev,
+              {
+                id: relId,
+                character_a_id: connectSourceId,
+                character_b_id: node.id,
+                relationship_type: null,
+                description: null,
+                relationship_type_a_to_b: null,
+                relationship_type_b_to_a: null,
+                description_a_to_b: null,
+                description_b_to_a: null,
+              },
+            ]);
+          })
+          .catch(console.error);
+        setConnectSourceId(null);
+        setConnectMode(false);
       }
-      setConnectSourceId(null);
-      setConnectMode(false);
     },
-    [connectSourceId, currentBookId, relationships]
+    [connectMode, connectSourceId, currentBookId, relationships]
   );
 
-  const handlePaneClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (connectMode) return;
-      if ((e.target as HTMLElement).closest('[data-relationship-node]')) return;
-      setSelectedRelId(null);
+  const handleNodeRightClick = useCallback(
+    (node: GraphNode, e: MouseEvent) => {
+      e.preventDefault();
+      handleAddAvatar(node.id);
     },
-    [connectMode]
+    [handleAddAvatar]
   );
+
+  const handleNodeDragEnd = useCallback(
+    (node: GraphNode) => {
+      const n = node as GraphNode & { x?: number; y?: number };
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      savePosition(node.id, x, y);
+    },
+    [savePosition]
+  );
+
+  const handleLinkClick = useCallback((link: GraphLink) => {
+    const r = link.relationship;
+    setSelectedRelId(r.id);
+    setEditTypeA2B(r.relationship_type_a_to_b ?? r.relationship_type ?? '');
+    setEditTypeB2A(r.relationship_type_b_to_a ?? '');
+    setEditDescA2B(r.description_a_to_b ?? r.description ?? '');
+    setEditDescB2A(r.description_b_to_a ?? '');
+  }, []);
 
   const selectedRel = relationships.find((r) => r.id === selectedRelId);
-  const edgeData = selectedRel
-    ? {
-        id: selectedRel.id,
-        charAId: selectedRel.character_a_id,
-        charBId: selectedRel.character_b_id,
-      }
-    : null;
-  const charAName = edgeData
-    ? characters.find((c) => c.id === edgeData.charAId)?.name ?? ''
+  const charAName = selectedRel
+    ? characters.find((c) => c.id === selectedRel.character_a_id)?.name ?? ''
     : '';
-  const charBName = edgeData
-    ? characters.find((c) => c.id === edgeData.charBId)?.name ?? ''
+  const charBName = selectedRel
+    ? characters.find((c) => c.id === selectedRel.character_b_id)?.name ?? ''
     : '';
 
   const saveEdgeEdit = useCallback(async () => {
@@ -524,6 +329,98 @@ export function RelationshipMapView() {
     }
   }, [selectedRelId]);
 
+  const nodeCanvasObject = useCallback(
+    (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const n = node as GraphNode & { x?: number; y?: number };
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const isConnectSource = connectSourceId === node.id;
+      const label = node.name;
+      const fontSize = 12 / globalScale;
+      ctx.font = `${fontSize}px Sans-Serif`;
+
+      ctx.save();
+      ctx.translate(x, y);
+
+      ctx.beginPath();
+      ctx.arc(0, -10, NODE_R, 0, 2 * Math.PI);
+      ctx.fillStyle = 'var(--bg-tertiary)';
+      ctx.fill();
+      ctx.strokeStyle = isConnectSource ? 'var(--accent)' : 'var(--accent)';
+      ctx.lineWidth = isConnectSource ? 4 : 2;
+      ctx.stroke();
+
+      if (node.avatar_url) {
+        let img = imgCache.current.get(node.avatar_url);
+        if (!img) {
+          img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => forceUpdate((n) => n + 1);
+          img.src = node.avatar_url;
+          imgCache.current.set(node.avatar_url, img);
+        }
+        if (img.complete && img.naturalWidth) {
+          ctx.beginPath();
+          ctx.arc(0, -10, NODE_R - 2, 0, 2 * Math.PI);
+          ctx.clip();
+          ctx.drawImage(img, -NODE_R + 2, -10 - NODE_R + 2, (NODE_R - 2) * 2, (NODE_R - 2) * 2);
+          ctx.restore();
+          ctx.save();
+          ctx.translate(x, y);
+        } else {
+          ctx.fillStyle = 'var(--text-secondary)';
+          ctx.font = `24px Sans-Serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label.charAt(0).toUpperCase(), 0, -10);
+        }
+      } else {
+        ctx.fillStyle = 'var(--text-secondary)';
+        ctx.font = `24px Sans-Serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label.charAt(0).toUpperCase(), 0, -10);
+      }
+
+      ctx.fillStyle = 'var(--text-primary)';
+      ctx.font = `${fontSize}px Sans-Serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(label, 0, NODE_R - 4);
+
+      ctx.restore();
+    },
+    [connectSourceId]
+  );
+
+  const nodePointerAreaPaint = useCallback(
+    (node: GraphNode, color: string, ctx: CanvasRenderingContext2D, _globalScale: number) => {
+      const n = node as GraphNode & { x?: number; y?: number };
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      ctx.beginPath();
+      ctx.arc(x, y - 10, NODE_R + 8, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+    },
+    []
+  );
+
+  const nodeLabel = useCallback(
+    (node: GraphNode) => {
+      const c = node.character;
+      const parts: string[] = [c.name];
+      if (c.description) parts.push(c.description);
+      if (c.faction_id && factionMap.has(c.faction_id))
+        parts.push(`Фракция: ${factionMap.get(c.faction_id)}`);
+      if (c.location_id && locationMap.has(c.location_id))
+        parts.push(`Локация: ${locationMap.get(c.location_id)}`);
+      if (c.role) parts.push(`Роль: ${ROLE_LABELS[c.role] || c.role}`);
+      return parts.join('\n');
+    },
+    [factionMap, locationMap]
+  );
+
   if (loading) {
     return (
       <div
@@ -554,7 +451,7 @@ export function RelationshipMapView() {
         }}
       >
         <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-          Карта отношений: перетащите узлы. Колёсико — зум, перетаскивание пустого места — панорама.
+          Карта отношений: перетащите узлы, колёсико — зум. ПКМ по узлу — добавить аватар.
         </span>
         <button
           onClick={() => {
@@ -597,89 +494,78 @@ export function RelationshipMapView() {
           </button>
         )}
         {selectedRelId && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              flexWrap: 'wrap',
-            }}
-          >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
               {charAName} ↔ {charBName}
             </span>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <select
-                value={editTypeA2B}
-                onChange={(e) => setEditTypeA2B(e.target.value)}
-                style={{
-                  padding: '6px 10px',
-                  fontSize: 12,
-                  background: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 6,
-                  color: 'var(--text-primary)',
-                  minWidth: 120,
-                }}
-              >
-                <option value="">— {charAName} → {charBName}</option>
-                {RELATIONSHIP_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={editDescA2B}
-                onChange={(e) => setEditDescA2B(e.target.value)}
-                placeholder="Описание"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: 12,
-                  background: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 6,
-                  color: 'var(--text-primary)',
-                  width: 100,
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <select
-                value={editTypeB2A}
-                onChange={(e) => setEditTypeB2A(e.target.value)}
-                style={{
-                  padding: '6px 10px',
-                  fontSize: 12,
-                  background: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 6,
-                  color: 'var(--text-primary)',
-                  minWidth: 120,
-                }}
-              >
-                <option value="">— {charBName} → {charAName}</option>
-                {RELATIONSHIP_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={editDescB2A}
-                onChange={(e) => setEditDescB2A(e.target.value)}
-                placeholder="Описание"
-                style={{
-                  padding: '6px 10px',
-                  fontSize: 12,
-                  background: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 6,
-                  color: 'var(--text-primary)',
-                  width: 100,
-                }}
-              />
-            </div>
+            <select
+              value={editTypeA2B}
+              onChange={(e) => setEditTypeA2B(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                fontSize: 12,
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                color: 'var(--text-primary)',
+                minWidth: 120,
+              }}
+            >
+              <option value="">— {charAName} → {charBName}</option>
+              {RELATIONSHIP_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input
+              value={editDescA2B}
+              onChange={(e) => setEditDescA2B(e.target.value)}
+              placeholder="Описание"
+              style={{
+                padding: '6px 10px',
+                fontSize: 12,
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                color: 'var(--text-primary)',
+                width: 100,
+              }}
+            />
+            <select
+              value={editTypeB2A}
+              onChange={(e) => setEditTypeB2A(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                fontSize: 12,
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                color: 'var(--text-primary)',
+                minWidth: 120,
+              }}
+            >
+              <option value="">— {charBName} → {charAName}</option>
+              {RELATIONSHIP_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input
+              value={editDescB2A}
+              onChange={(e) => setEditDescB2A(e.target.value)}
+              placeholder="Описание"
+              style={{
+                padding: '6px 10px',
+                fontSize: 12,
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                color: 'var(--text-primary)',
+                width: 100,
+              }}
+            />
             <button
               onClick={saveEdgeEdit}
               style={{
@@ -760,109 +646,33 @@ export function RelationshipMapView() {
             </div>
           </div>
         ) : (
-          <MapCanvas canvasWidth={2000} canvasHeight={2000}>
-            <div
-              onClick={handlePaneClick}
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: '100%',
-                height: '100%',
-                pointerEvents: 'auto',
-              }}
-            >
-              <svg
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  width: '100%',
-                  height: '100%',
-                  pointerEvents: 'none',
-                }}
-              >
-                {relationships.map((r) => {
-                  const a = posMap.get(r.character_a_id);
-                  const b = posMap.get(r.character_b_id);
-                  if (!a || !b) return null;
-                  const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type;
-                  const typeB2A = r.relationship_type_b_to_a;
-                  const color =
-                    EDGE_COLORS[typeA2B || ''] || EDGE_COLORS[typeB2A || ''] || '#94a3b8';
-                  return (
-                    <line
-                      key={r.id}
-                      x1={a.x}
-                      y1={a.y}
-                      x2={b.x}
-                      y2={b.y}
-                      stroke={color}
-                      strokeWidth={selectedRelId === r.id ? 4 : 2}
-                      strokeOpacity={selectedRelId === r.id ? 1 : 0.8}
-                    />
-                  );
-                })}
-              </svg>
-              <svg
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  width: '100%',
-                  height: '100%',
-                  pointerEvents: 'stroke',
-                  cursor: 'pointer',
-                }}
-              >
-                {relationships.map((r) => {
-                  const a = posMap.get(r.character_a_id);
-                  const b = posMap.get(r.character_b_id);
-                  if (!a || !b) return null;
-                  return (
-                    <line
-                      key={r.id}
-                      x1={a.x}
-                      y1={a.y}
-                      x2={b.x}
-                      y2={b.y}
-                      stroke="transparent"
-                      strokeWidth={16}
-                      data-rel-id={r.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedRelId(r.id);
-                        const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type ?? '';
-                        const typeB2A = r.relationship_type_b_to_a ?? '';
-                        setEditTypeA2B(typeA2B);
-                        setEditTypeB2A(typeB2A);
-                        setEditDescA2B(r.description_a_to_b ?? r.description ?? '');
-                        setEditDescB2A(r.description_b_to_a ?? '');
-                      }}
-                    />
-                  );
-                })}
-              </svg>
-              {characters.map((char) => (
-                <div key={char.id} data-relationship-node="1">
-                  <DraggableCharacterNode
-                    char={char}
-                    pos={getPos(char)}
-                    factionName={char.faction_id ? factionMap.get(char.faction_id) : undefined}
-                    locationName={char.location_id ? locationMap.get(char.location_id) : undefined}
-                    dragging={dragging === char.id}
-                    onDragStart={handleDragStart}
-                    onDragMove={handleDragMove}
-                    onDragEnd={handleDragEnd}
-                    onAddAvatar={handleAddAvatar}
-                    onNodeClick={handleNodeClickInConnectMode}
-                    connectMode={connectMode}
-                    isConnectSource={connectSourceId === char.id}
-                  />
-                </div>
-              ))}
-            </div>
-          </MapCanvas>
+          <ForceGraph2D
+            graphData={graphData}
+            nodeId="id"
+            linkSource="source"
+            linkTarget="target"
+            nodeCanvasObject={nodeCanvasObject}
+            nodeCanvasObjectMode="replace"
+            nodePointerAreaPaint={nodePointerAreaPaint}
+            nodeLabel={nodeLabel}
+            linkColor={(link: GraphLink) => {
+              const r = link.relationship;
+              const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type;
+              const typeB2A = r.relationship_type_b_to_a;
+              return (
+                EDGE_COLORS[typeA2B || ''] || EDGE_COLORS[typeB2A || ''] || '#94a3b8'
+              );
+            }}
+            linkWidth={(link: GraphLink) => (selectedRelId === link.id ? 3 : 2)}
+            onNodeClick={(node) => handleNodeClick(node as GraphNode)}
+            onNodeRightClick={(node, e) => handleNodeRightClick(node as GraphNode, e)}
+            onNodeDragEnd={(node) => handleNodeDragEnd(node as GraphNode)}
+            onLinkClick={(link) => handleLinkClick(link as GraphLink)}
+            onBackgroundClick={() => setSelectedRelId(null)}
+            backgroundColor="var(--bg-primary)"
+            minZoom={0.2}
+            maxZoom={4}
+          />
         )}
       </div>
     </div>
