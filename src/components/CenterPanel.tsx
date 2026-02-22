@@ -24,9 +24,16 @@ export function CenterPanel({ viewMode, onExportReady, focusMode }: CenterPanelP
     return () => onExportReady?.(null);
   }, [viewMode, onExportReady]);
 
-  if (viewMode === 'mindmap') return <MindMapView />;
-  if (viewMode === 'timeline') return <TimelineView />;
-  if (viewMode === 'relationships') return <RelationshipMapView />;
-  if (viewMode === 'worldmap') return <WorldMapView />;
-  return <ChapterEditor focusMode={focusMode} />;
+  const content =
+    viewMode === 'mindmap' ? <MindMapView /> :
+    viewMode === 'timeline' ? <TimelineView /> :
+    viewMode === 'relationships' ? <RelationshipMapView /> :
+    viewMode === 'worldmap' ? <WorldMapView /> :
+    <ChapterEditor focusMode={focusMode} />;
+
+  return (
+    <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex' }}>
+      {content}
+    </div>
+  );
 }

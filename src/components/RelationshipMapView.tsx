@@ -257,8 +257,8 @@ export function RelationshipMapView() {
       const dx = 150;
       const dy = 120;
       return {
-        x: c.map_x ?? 300 + (i % 4) * dx,
-        y: c.map_y ?? 200 + Math.floor(i / 4) * dy,
+        x: c.map_x ?? 80 + (i % 4) * dx,
+        y: c.map_y ?? 80 + Math.floor(i / 4) * dy,
       };
     },
     [characters]
@@ -524,34 +524,34 @@ export function RelationshipMapView() {
                 }}
                 style={{ position: 'absolute', inset: 0 }}
               >
-                {factionGroups.map(({ factionId, chars: list }) => {
-                  const faction = factions.find((f) => f.id === factionId);
-                  if (!faction || list.length < 2) return null;
-                  const positions = list.map((c) => posMap(c));
-                  const minX = Math.min(...positions.map((p) => p.x)) - 50;
-                  const maxX = Math.max(...positions.map((p) => p.x)) + 50;
-                  const minY = Math.min(...positions.map((p) => p.y)) - 60;
-                  const maxY = Math.max(...positions.map((p) => p.y)) + 60;
-                  return (
-                    <g key={factionId}>
-                      <rect
-                        x={minX}
-                        y={minY}
-                        width={maxX - minX}
-                        height={maxY - minY}
-                        rx={12}
-                        ry={12}
-                        fill="rgba(59, 130, 246, 0.08)"
-                        stroke="rgba(59, 130, 246, 0.5)"
-                        strokeWidth={2}
-                      />
-                      <text x={minX + 8} y={minY - 8} fontSize={11} fill="var(--text-secondary)" fontWeight={600}>
-                        {faction.name.toUpperCase()}
-                      </text>
-                    </g>
-                  );
-                })}
                 <svg style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                  {factionGroups.map(({ factionId, chars: list }) => {
+                    const faction = factions.find((f) => f.id === factionId);
+                    if (!faction || list.length < 2) return null;
+                    const positions = list.map((c) => posMap(c));
+                    const minX = Math.min(...positions.map((p) => p.x)) - 50;
+                    const maxX = Math.max(...positions.map((p) => p.x)) + 50;
+                    const minY = Math.min(...positions.map((p) => p.y)) - 60;
+                    const maxY = Math.max(...positions.map((p) => p.y)) + 60;
+                    return (
+                      <g key={factionId}>
+                        <rect
+                          x={minX}
+                          y={minY}
+                          width={maxX - minX}
+                          height={maxY - minY}
+                          rx={12}
+                          ry={12}
+                          fill="rgba(59, 130, 246, 0.08)"
+                          stroke="rgba(59, 130, 246, 0.5)"
+                          strokeWidth={2}
+                        />
+                        <text x={minX + 8} y={minY - 8} fontSize={11} fill="var(--text-secondary)" fontWeight={600}>
+                          {faction.name.toUpperCase()}
+                        </text>
+                      </g>
+                    );
+                  })}
                   {relationships.map((r) => {
                     const a = characters.find((c) => c.id === r.character_a_id);
                     const b = characters.find((c) => c.id === r.character_b_id);
