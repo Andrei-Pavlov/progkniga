@@ -126,10 +126,10 @@ function CharacterNode({ data }: { data: CharacterNodeData }) {
           flexShrink: 0,
         }}
       >
-        <Handle type="target" position={Position.Top} id="top" style={{ top: 0 }} />
-        <Handle type="target" position={Position.Left} id="left" style={{ left: 0 }} />
-        <Handle type="source" position={Position.Bottom} id="bottom" style={{ bottom: 0 }} />
-        <Handle type="source" position={Position.Right} id="right" style={{ right: 0 }} />
+        <Handle type="target" position={Position.Top} id="top" style={{ top: 0, width: 14, height: 14 }} />
+        <Handle type="target" position={Position.Left} id="left" style={{ left: 0, width: 14, height: 14 }} />
+        <Handle type="source" position={Position.Bottom} id="bottom" style={{ bottom: 0, width: 14, height: 14 }} />
+        <Handle type="source" position={Position.Right} id="right" style={{ right: 0, width: 14, height: 14 }} />
         {data.avatarUrl ? (
           <img
             src={data.avatarUrl}
@@ -233,7 +233,6 @@ function CharacterNode({ data }: { data: CharacterNodeData }) {
 export function RelationshipMapView() {
   const currentBookId = useStore((s) => s.currentBookId);
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
@@ -299,7 +298,6 @@ export function RelationshipMapView() {
         invoke<{ id: string; name: string }[]>('get_locations', { bookId: currentBookId }),
       ]);
       setCharacters(chars);
-      setRelationships(rels);
 
       const factionMap = new Map(facs.map((f) => [f.id, f.name]));
       const locationMap = new Map(locs.map((l) => [l.id, l.name]));
@@ -342,6 +340,14 @@ export function RelationshipMapView() {
         };
       });
 
+      setNodes((prev) => {
+        const posMap = new Map(prev.map((n) => [n.id, n.position]));
+        return nodeList.map((n) => ({
+          ...n,
+          position: posMap.get(n.id) ?? n.position,
+        }));
+      });
+
       const edgeList: Edge[] = rels.map((r) => {
         const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type;
         const typeB2A = r.relationship_type_b_to_a;
@@ -370,7 +376,6 @@ export function RelationshipMapView() {
         };
       });
 
-      setNodes(nodeList);
       setEdges(edgeList);
     } catch (e) {
       console.error(e);
@@ -387,20 +392,51 @@ export function RelationshipMapView() {
     async (params: Connection) => {
       if (!currentBookId || !params.source || !params.target) return;
       if (params.source === params.target) return;
+      const sourceId = params.source;
+      const targetId = params.target;
+      const exists = edges.some(
+        (e) =>
+          (e.source === sourceId && e.target === targetId) ||
+          (e.source === targetId && e.target === sourceId)
+      );
+      if (exists) return;
       try {
-        await invoke('create_character_relationship', {
+        const relId = await invoke<string>('create_character_relationship', {
           bookId: currentBookId,
-          characterAId: params.source,
-          characterBId: params.target,
+          characterAId: sourceId,
+          characterBId: targetId,
           relationshipType: null,
           description: null,
         });
-        loadData();
+        setEdges((eds) => [
+          ...eds,
+          {
+            id: relId,
+            source: sourceId,
+            target: targetId,
+            type: 'smoothstep',
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
+            style: { stroke: '#94a3b8', strokeWidth: 2 },
+            label: '',
+            labelStyle: { fill: 'var(--text-primary)', fontSize: 11 },
+            labelBgStyle: { fill: 'var(--bg-tertiary)', fillOpacity: 0.9 },
+            labelBgPadding: [6, 4] as [number, number],
+            labelBgBorderRadius: 6,
+            data: {
+              typeA2B: undefined,
+              typeB2A: undefined,
+              descA2B: undefined,
+              descB2A: undefined,
+              characterAId: sourceId < targetId ? sourceId : targetId,
+              characterBId: sourceId < targetId ? targetId : sourceId,
+            },
+          },
+        ]);
       } catch (e) {
         console.error(e);
       }
     },
-    [currentBookId, loadData]
+    [currentBookId, edges, setEdges]
   );
 
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
@@ -422,11 +458,16 @@ export function RelationshipMapView() {
         description_a_to_b: editDescA2B.trim(),
         description_b_to_a: editDescB2A.trim(),
       });
+      const labelParts = [editTypeA2B.trim(), editTypeB2A.trim()].filter(Boolean);
+      const newLabel = labelParts.length ? labelParts.join(' ↔ ') : '';
+      const newColor = EDGE_COLORS[editTypeA2B.trim()] || EDGE_COLORS[editTypeB2A.trim()] || '#94a3b8';
+
       setEdges((eds) =>
         eds.map((e) =>
           e.id === selectedEdge.id
             ? {
                 ...e,
+                label: newLabel,
                 data: {
                   ...e.data,
                   typeA2B: editTypeA2B.trim() || undefined,
@@ -436,11 +477,9 @@ export function RelationshipMapView() {
                 },
                 style: {
                   ...e.style,
-                  stroke:
-                    EDGE_COLORS[editTypeA2B.trim()] ||
-                    EDGE_COLORS[editTypeB2A.trim()] ||
-                    '#94a3b8',
+                  stroke: newColor,
                 },
+                markerEnd: { type: MarkerType.ArrowClosed, color: newColor },
               }
             : e
         )
@@ -462,9 +501,11 @@ export function RelationshipMapView() {
     }
   }, [selectedEdge, setEdges]);
 
-  const rel = selectedEdge ? relationships.find((r) => r.id === selectedEdge.id) : null;
-  const charAName = rel ? characters.find((c) => c.id === rel.character_a_id)?.name : '';
-  const charBName = rel ? characters.find((c) => c.id === rel.character_b_id)?.name : '';
+  const edgeData = selectedEdge?.data as { characterAId?: string; characterBId?: string } | undefined;
+  const idA = edgeData?.characterAId ?? selectedEdge?.source ?? '';
+  const idB = edgeData?.characterBId ?? selectedEdge?.target ?? '';
+  const charAName = characters.find((c) => c.id === idA)?.name ?? '';
+  const charBName = characters.find((c) => c.id === idB)?.name ?? '';
 
   if (loading) {
     return (
@@ -628,6 +669,40 @@ export function RelationshipMapView() {
         )}
       </div>
       <div style={{ flex: 1, position: 'relative' }}>
+        {!currentBookId ? (
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-secondary)',
+              fontSize: 15,
+            }}
+          >
+            Выберите книгу в левой панели
+          </div>
+        ) : nodes.length === 0 ? (
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              background: 'var(--bg-primary)',
+              color: 'var(--text-secondary)',
+              fontSize: 15,
+            }}
+          >
+            <div>Добавьте персонажей в базе мира (правая панель)</div>
+            <div style={{ fontSize: 13, opacity: 0.8 }}>
+              Затем перетащите от одного персонажа к другому, чтобы создать связь
+            </div>
+          </div>
+        ) : (
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -635,14 +710,21 @@ export function RelationshipMapView() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onEdgeClick={onEdgeClick}
+          onPaneClick={() => setSelectedEdge(null)}
           nodeTypes={nodeTypes}
           fitView
+          fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
+          connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 2 }}
+          nodesDraggable
+          nodesConnectable
+          elementsSelectable
           style={{ background: 'var(--bg-primary)' }}
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
           <Controls />
           <MiniMap />
         </ReactFlow>
+        )}
       </div>
     </div>
   );
