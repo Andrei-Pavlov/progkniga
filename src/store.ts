@@ -1,5 +1,11 @@
 import { create } from 'zustand';
 
+const DEMO_LIMITS = {
+  entities: 5,
+  chapters: 5,
+  charsPerChapter: 5000,
+} as const;
+
 const STORAGE_KEYS = {
   auth: 'storyweaver_auth',
   project: 'storyweaver_project',
@@ -138,6 +144,8 @@ export const useStore = create<AppState>((set) => ({
   setViewMode: (v) => set({ viewMode: v }),
   setSearchOpen: (v) => set({ searchOpen: v }),
 }));
+
+export { DEMO_LIMITS };
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement;

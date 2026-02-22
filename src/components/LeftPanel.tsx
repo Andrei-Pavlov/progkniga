@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useStore } from '../store';
+import { useStore, DEMO_LIMITS } from '../store';
 
 interface Book {
   id: string;
@@ -21,6 +21,8 @@ export function LeftPanel() {
   const setViewMode = useStore((s) => s.setViewMode);
   const currentProject = useStore((s) => s.currentProject);
   const currentBookId = useStore((s) => s.currentBookId);
+  const isAuthenticated = useStore((s) => s.isAuthenticated);
+  const isDemo = !isAuthenticated;
   const setCurrentBookId = useStore((s) => s.setCurrentBookId);
   const selectedChapterId = useStore((s) => s.selectedChapterId);
   const setSelectedChapterId = useStore((s) => s.setSelectedChapterId);
@@ -70,8 +72,9 @@ export function LeftPanel() {
     return chapters.filter((c) => c.title.toLowerCase().includes(q));
   }, [chapters, searchQuery]);
 
+  const atChapterLimit = isDemo && chapters.length >= DEMO_LIMITS.chapters;
   const handleAddChapter = async () => {
-    if (!currentBookId || !newChapterTitle.trim()) return;
+    if (!currentBookId || !newChapterTitle.trim() || atChapterLimit) return;
     try {
       const id = await invoke<string>('create_chapter', {
         bookId: currentBookId,
@@ -279,6 +282,7 @@ export function LeftPanel() {
       {currentBook && (
         <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
           <h4 style={{ margin: '0 0 8px 0', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Главы</h4>
+          {isDemo && <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {chapters.length}/{DEMO_LIMITS.chapters} глав</p>}
           <input
             type="text"
             placeholder="Поиск глав..."
@@ -298,14 +302,15 @@ export function LeftPanel() {
             />
             <button
               onClick={handleAddChapter}
+              disabled={atChapterLimit}
               style={{
                 padding: '6px 12px',
                 fontSize: 12,
-                background: 'var(--accent)',
-                color: 'white',
+                background: atChapterLimit ? 'var(--bg-tertiary)' : 'var(--accent)',
+                color: atChapterLimit ? 'var(--text-secondary)' : 'white',
                 border: 'none',
                 borderRadius: 4,
-                cursor: 'pointer',
+                cursor: atChapterLimit ? 'not-allowed' : 'pointer',
               }}
             >
               +

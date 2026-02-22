@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
-import { useStore } from '../store';
+import { useStore, DEMO_LIMITS } from '../store';
 import { useToastStore } from '../store-toast';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 
@@ -17,6 +17,8 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
   const selectedChapterId = useStore((s) => s.selectedChapterId);
   const setSelectedChapterId = useStore((s) => s.setSelectedChapterId);
   const currentBookId = useStore((s) => s.currentBookId);
+  const isAuthenticated = useStore((s) => s.isAuthenticated);
+  const isDemo = !isAuthenticated;
   const editorFontFamily = useStore((s) => s.editorFontFamily);
   const editorFontSize = useStore((s) => s.editorFontSize);
   const editorLineHeight = useStore((s) => s.editorLineHeight);
@@ -58,13 +60,17 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
       const chapter = await invoke<{ id: string; title: string; content: string }>('get_chapter', {
         chapterId: selectedChapterId,
       });
-      setContent(chapter.content || '');
+      let text = chapter.content || '';
+      if (isDemo && text.length > DEMO_LIMITS.charsPerChapter) {
+        text = text.slice(0, DEMO_LIMITS.charsPerChapter);
+      }
+      setContent(text);
       setTitle(chapter.title);
-      contentRef.current = chapter.content || '';
+      contentRef.current = text;
     } catch (e) {
       console.error(e);
     }
-  }, [selectedChapterId]);
+  }, [selectedChapterId, isDemo]);
 
   useEffect(() => {
     loadChapter();
@@ -72,11 +78,15 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
 
   const saveChapter = useCallback(async () => {
     if (!selectedChapterId) return;
+    let toSave = contentRef.current;
+    if (isDemo && toSave.length > DEMO_LIMITS.charsPerChapter) {
+      toSave = toSave.slice(0, DEMO_LIMITS.charsPerChapter);
+    }
     setSaveStatus('saving');
     try {
       await invoke('update_chapter_content', {
         chapterId: selectedChapterId,
-        content: contentRef.current,
+        content: toSave,
       });
       setSaveStatus('saved');
       toast('Сохранено', 'success');
@@ -86,7 +96,7 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
       toast('Ошибка сохранения', 'error');
       setSaveStatus('idle');
     }
-  }, [selectedChapterId, toast]);
+  }, [selectedChapterId, toast, isDemo]);
 
   useEffect(() => {
     contentRef.current = content;
@@ -222,7 +232,10 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
       const end = ta.selectionEnd;
       const before = contentRef.current.substring(0, start);
       const after = contentRef.current.substring(end);
-      const newContent = before + text + after;
+      let newContent = before + text + after;
+      if (isDemo && newContent.length > DEMO_LIMITS.charsPerChapter) {
+        newContent = newContent.slice(0, DEMO_LIMITS.charsPerChapter);
+      }
       setContent(newContent);
       contentRef.current = newContent;
       setTimeout(() => {
@@ -232,7 +245,7 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
     };
     window.addEventListener('storyweaver-insert-text', handler);
     return () => window.removeEventListener('storyweaver-insert-text', handler);
-  }, []);
+  }, [isDemo]);
 
   if (!selectedChapterId) {
     return (
@@ -309,8 +322,8 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
             ›
           </button>
         </div>
-        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-          {wordCount} слов · {charCount} симв.
+        <span style={{ fontSize: 12, color: isDemo && charCount >= DEMO_LIMITS.charsPerChapter ? 'var(--error)' : 'var(--text-secondary)' }}>
+          {wordCount} слов · {charCount}{isDemo ? `/${DEMO_LIMITS.charsPerChapter}` : ''} симв.
         </span>
         <button
           onClick={saveChapter}
@@ -390,8 +403,15 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
       <textarea
         ref={textareaRef}
         value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Начните писать..."
+        onChange={(e) => {
+          const v = e.target.value;
+          if (isDemo && v.length > DEMO_LIMITS.charsPerChapter) {
+            setContent(v.slice(0, DEMO_LIMITS.charsPerChapter));
+          } else {
+            setContent(v);
+          }
+        }}
+        placeholder={isDemo ? `Начните писать... (макс. ${DEMO_LIMITS.charsPerChapter} символов)` : 'Начните писать...'}
         style={{
           flex: 1,
           padding: 24,

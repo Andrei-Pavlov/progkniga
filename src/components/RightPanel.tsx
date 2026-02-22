@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useStore } from '../store';
+import { useStore, DEMO_LIMITS } from '../store';
 
 interface Character {
   id: string;
@@ -69,6 +69,8 @@ const LORE_CATEGORIES = ['История', 'Магия', 'Культура', 'Г
 
 export function RightPanel() {
   const currentBookId = useStore((s) => s.currentBookId);
+  const isAuthenticated = useStore((s) => s.isAuthenticated);
+  const isDemo = !isAuthenticated;
   const [characters, setCharacters] = useState<Character[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -298,6 +300,8 @@ export function RightPanel() {
             onShowAppearances={loadAppearances}
             commonInputStyle={commonInputStyle}
             commonBtnStyle={commonBtnStyle}
+            isDemo={isDemo}
+            limit={DEMO_LIMITS.entities}
           />
         )}
         {activeTab === 'locations' && (
@@ -307,6 +311,8 @@ export function RightPanel() {
               currentBookId={currentBookId}
               loadData={loadData}
               commonInputStyle={commonInputStyle}
+              isDemo={isDemo}
+              limit={DEMO_LIMITS.entities}
             />
             {renderLocationTree(null, 0)}
           </div>
@@ -323,6 +329,8 @@ export function RightPanel() {
             onShowAppearances={loadAppearances}
             commonInputStyle={commonInputStyle}
             commonBtnStyle={commonBtnStyle}
+            isDemo={isDemo}
+            limit={DEMO_LIMITS.entities}
           />
         )}
         {activeTab === 'factions' && (
@@ -338,6 +346,8 @@ export function RightPanel() {
             onShowAppearances={loadAppearances}
             commonInputStyle={commonInputStyle}
             commonBtnStyle={commonBtnStyle}
+            isDemo={isDemo}
+            limit={DEMO_LIMITS.entities}
           />
         )}
         {activeTab === 'lore' && (
@@ -350,6 +360,8 @@ export function RightPanel() {
             onDelete={(id) => setDeleteConfirm(`lore:${id}`)}
             commonInputStyle={commonInputStyle}
             commonBtnStyle={commonBtnStyle}
+            isDemo={isDemo}
+            limit={DEMO_LIMITS.entities}
           />
         )}
       </div>
@@ -463,6 +475,8 @@ function CharactersTab({
   onShowAppearances,
   commonInputStyle,
   commonBtnStyle,
+  isDemo,
+  limit,
 }: {
   characters: Character[];
   factions: Faction[];
@@ -476,10 +490,13 @@ function CharactersTab({
   onShowAppearances: (type: string, id: string, name: string) => void;
   commonInputStyle: React.CSSProperties;
   commonBtnStyle: React.CSSProperties;
+  isDemo?: boolean;
+  limit?: number;
 }) {
   const [newName, setNewName] = useState('');
+  const atLimit = isDemo && limit !== undefined && characters.length >= limit;
   const handleAdd = async () => {
-    if (!currentBookId || !newName.trim()) return;
+    if (!currentBookId || !newName.trim() || atLimit) return;
     await invoke('create_character', { bookId: currentBookId, name: newName.trim(), description: null });
     setNewName('');
     loadData();
@@ -488,6 +505,7 @@ function CharactersTab({
   return (
     <>
       <div style={{ marginBottom: 12 }}>
+        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {characters.length}/{limit} персонажей</p>}
         <input
           placeholder="Имя персонажа"
           value={newName}
@@ -495,7 +513,7 @@ function CharactersTab({
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           style={commonInputStyle}
         />
-        <button onClick={handleAdd} style={{ marginTop: 6, padding: '8px 14px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: 6 }}>
+        <button onClick={handleAdd} disabled={atLimit} style={{ marginTop: 6, padding: '8px 14px', background: atLimit ? 'var(--bg-tertiary)' : 'var(--accent)', color: atLimit ? 'var(--text-secondary)' : 'white', border: 'none', borderRadius: 6, cursor: atLimit ? 'not-allowed' : 'pointer' }}>
           + Добавить
         </button>
       </div>
@@ -710,17 +728,22 @@ function AddLocationForm({
   currentBookId,
   loadData,
   commonInputStyle,
+  isDemo,
+  limit,
 }: {
   locations: Location[];
   currentBookId: string | null;
   loadData: () => void;
   commonInputStyle: React.CSSProperties;
+  isDemo?: boolean;
+  limit?: number;
 }) {
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [parentId, setParentId] = useState<string | null>(null);
+  const atLimit = isDemo && limit !== undefined && locations.length >= limit;
   const handleAdd = async () => {
-    if (!currentBookId || !name.trim()) return;
+    if (!currentBookId || !name.trim() || atLimit) return;
     await invoke('create_location', { bookId: currentBookId, name: name.trim(), parentId: parentId, description: desc.trim() || null });
     setName('');
     setDesc('');
@@ -729,6 +752,7 @@ function AddLocationForm({
   };
   return (
     <div style={{ marginBottom: 12 }}>
+      {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {locations.length}/{limit} локаций</p>}
       <input placeholder="Название" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} style={commonInputStyle} />
       <textarea placeholder="Описание" value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} style={{ ...commonInputStyle, width: '100%', marginTop: 6, resize: 'vertical' }} />
       <select value={parentId || ''} onChange={(e) => setParentId(e.target.value || null)} style={{ ...commonInputStyle, width: '100%', marginTop: 6 }}>
@@ -739,7 +763,7 @@ function AddLocationForm({
           </option>
         ))}
       </select>
-      <button onClick={handleAdd} style={{ marginTop: 6, padding: '8px 14px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: 6 }}>
+      <button onClick={handleAdd} disabled={atLimit} style={{ marginTop: 6, padding: '8px 14px', background: atLimit ? 'var(--bg-tertiary)' : 'var(--accent)', color: atLimit ? 'var(--text-secondary)' : 'white', border: 'none', borderRadius: 6, cursor: atLimit ? 'not-allowed' : 'pointer' }}>
         + Добавить
       </button>
     </div>
@@ -757,6 +781,8 @@ function ItemsTab({
   onShowAppearances,
   commonInputStyle,
   commonBtnStyle,
+  isDemo,
+  limit,
 }: {
   items: Item[];
   editing: EditingEntity;
@@ -768,11 +794,14 @@ function ItemsTab({
   onShowAppearances: (type: string, id: string, name: string) => void;
   commonInputStyle: React.CSSProperties;
   commonBtnStyle: React.CSSProperties;
+  isDemo?: boolean;
+  limit?: number;
 }) {
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const atLimit = isDemo && limit !== undefined && items.length >= limit;
   const handleAdd = async () => {
-    if (!currentBookId || !newName.trim()) return;
+    if (!currentBookId || !newName.trim() || atLimit) return;
     await invoke('create_item', { bookId: currentBookId, name: newName.trim(), description: newDesc.trim() || null });
     setNewName('');
     setNewDesc('');
@@ -782,9 +811,10 @@ function ItemsTab({
   return (
     <>
       <div style={{ marginBottom: 12 }}>
+        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {items.length}/{limit} предметов</p>}
         <input placeholder="Название предмета" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} style={commonInputStyle} />
         <textarea placeholder="Описание" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} rows={2} style={{ ...commonInputStyle, width: '100%', marginTop: 6, resize: 'vertical' }} />
-        <button onClick={handleAdd} style={{ marginTop: 6, padding: '8px 14px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: 6 }}>
+        <button onClick={handleAdd} disabled={atLimit} style={{ marginTop: 6, padding: '8px 14px', background: atLimit ? 'var(--bg-tertiary)' : 'var(--accent)', color: atLimit ? 'var(--text-secondary)' : 'white', border: 'none', borderRadius: 6, cursor: atLimit ? 'not-allowed' : 'pointer' }}>
           + Добавить
         </button>
       </div>
@@ -832,6 +862,8 @@ function FactionsTab({
   onShowAppearances,
   commonInputStyle,
   commonBtnStyle,
+  isDemo,
+  limit,
 }: {
   factions: Faction[];
   characters: Character[];
@@ -844,11 +876,14 @@ function FactionsTab({
   onShowAppearances: (type: string, id: string, name: string) => void;
   commonInputStyle: React.CSSProperties;
   commonBtnStyle: React.CSSProperties;
+  isDemo?: boolean;
+  limit?: number;
 }) {
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const atLimit = isDemo && limit !== undefined && factions.length >= limit;
   const handleAdd = async () => {
-    if (!currentBookId || !newName.trim()) return;
+    if (!currentBookId || !newName.trim() || atLimit) return;
     await invoke('create_faction', { bookId: currentBookId, name: newName.trim(), description: newDesc.trim() || null });
     setNewName('');
     setNewDesc('');
@@ -858,9 +893,10 @@ function FactionsTab({
   return (
     <>
       <div style={{ marginBottom: 12 }}>
+        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {factions.length}/{limit} фракций</p>}
         <input placeholder="Название фракции" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} style={commonInputStyle} />
         <textarea placeholder="Описание" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} rows={2} style={{ ...commonInputStyle, width: '100%', marginTop: 6, resize: 'vertical' }} />
-        <button onClick={handleAdd} style={{ marginTop: 6, padding: '8px 14px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: 6 }}>
+        <button onClick={handleAdd} disabled={atLimit} style={{ marginTop: 6, padding: '8px 14px', background: atLimit ? 'var(--bg-tertiary)' : 'var(--accent)', color: atLimit ? 'var(--text-secondary)' : 'white', border: 'none', borderRadius: 6, cursor: atLimit ? 'not-allowed' : 'pointer' }}>
           + Добавить
         </button>
       </div>
@@ -933,6 +969,8 @@ function LoreTab({
   onDelete,
   commonInputStyle,
   commonBtnStyle,
+  isDemo,
+  limit,
 }: {
   entries: LoreEntry[];
   editing: EditingEntity;
@@ -942,12 +980,15 @@ function LoreTab({
   onDelete: (id: string) => void;
   commonInputStyle: React.CSSProperties;
   commonBtnStyle: React.CSSProperties;
+  isDemo?: boolean;
+  limit?: number;
 }) {
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [newCategory, setNewCategory] = useState('');
+  const atLimit = isDemo && limit !== undefined && entries.length >= limit;
   const handleAdd = async () => {
-    if (!currentBookId || !newTitle.trim()) return;
+    if (!currentBookId || !newTitle.trim() || atLimit) return;
     await invoke('create_lore_entry', { bookId: currentBookId, title: newTitle.trim(), content: newContent.trim(), category: newCategory.trim() || null });
     setNewTitle('');
     setNewContent('');
@@ -958,6 +999,7 @@ function LoreTab({
   return (
     <>
       <div style={{ marginBottom: 12 }}>
+        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {entries.length}/{limit} записей лора</p>}
         <input placeholder="Заголовок" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} style={commonInputStyle} />
         <textarea placeholder="Содержание" value={newContent} onChange={(e) => setNewContent(e.target.value)} rows={3} style={{ ...commonInputStyle, width: '100%', marginTop: 6, resize: 'vertical' }} />
         <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={{ ...commonInputStyle, width: '100%', marginTop: 6 }}>
@@ -968,7 +1010,7 @@ function LoreTab({
             </option>
           ))}
         </select>
-        <button onClick={handleAdd} style={{ marginTop: 6, padding: '8px 14px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: 6 }}>
+        <button onClick={handleAdd} disabled={atLimit} style={{ marginTop: 6, padding: '8px 14px', background: atLimit ? 'var(--bg-tertiary)' : 'var(--accent)', color: atLimit ? 'var(--text-secondary)' : 'white', border: 'none', borderRadius: 6, cursor: atLimit ? 'not-allowed' : 'pointer' }}>
           + Добавить
         </button>
       </div>
