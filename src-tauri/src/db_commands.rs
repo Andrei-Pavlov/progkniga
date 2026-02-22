@@ -68,6 +68,17 @@ pub struct Location {
     pub parent_id: Option<String>,
     pub name: String,
     pub description: Option<String>,
+    pub map_x: Option<f64>,
+    pub map_y: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CharacterRelationship {
+    pub id: String,
+    pub character_a_id: String,
+    pub character_b_id: String,
+    pub relationship_type: Option<String>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -437,7 +448,7 @@ pub fn get_mindmap_data(state: &DbState, book_id: &str) -> Result<MindMapData, S
 pub fn get_locations(state: &DbState, book_id: &str) -> Result<Vec<Location>, String> {
     let conn = state.db.conn();
     let mut stmt = conn
-        .prepare("SELECT id, book_id, parent_id, name, description FROM locations WHERE book_id = ?1 ORDER BY name")
+        .prepare("SELECT id, book_id, parent_id, name, description, map_x, map_y FROM locations WHERE book_id = ?1 ORDER BY name")
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([book_id], |row| {
@@ -447,6 +458,8 @@ pub fn get_locations(state: &DbState, book_id: &str) -> Result<Vec<Location>, St
                 parent_id: row.get(2)?,
                 name: row.get(3)?,
                 description: row.get(4)?,
+                map_x: row.get(5).ok().flatten(),
+                map_y: row.get(6).ok().flatten(),
             })
         })
         .map_err(|e| e.to_string())?
@@ -501,6 +514,103 @@ pub fn update_location(
         )
         .map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+pub fn update_location_map_position(
+    state: &DbState,
+    location_id: &str,
+    map_x: f64,
+    map_y: f64,
+) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute(
+        "UPDATE locations SET map_x = ?1, map_y = ?2, updated_at = datetime('now') WHERE id = ?3",
+        rusqlite::params![map_x, map_y, location_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn get_character_relationships(
+    state: &DbState,
+    book_id: &str,
+) -> Result<Vec<CharacterRelationship>, String> {
+    let conn = state.db.conn();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, character_a_id, character_b_id, relationship_type, description
+             FROM character_relationships WHERE book_id = ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([book_id], |row| {
+            Ok(CharacterRelationship {
+                id: row.get(0)?,
+                character_a_id: row.get(1)?,
+                character_b_id: row.get(2)?,
+                relationship_type: row.get(3)?,
+                description: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+pub fn create_character_relationship(
+    state: &DbState,
+    book_id: &str,
+    character_a_id: &str,
+    character_b_id: &str,
+    relationship_type: Option<&str>,
+    description: Option<&str>,
+) -> Result<String, String> {
+    let (a, b) = if character_a_id < character_b_id {
+        (character_a_id, character_b_id)
+    } else {
+        (character_b_id, character_a_id)
+    };
+    let id = Uuid::new_v4().to_string();
+    let conn = state.db.conn();
+    conn.execute(
+        "INSERT INTO character_relationships (id, book_id, character_a_id, character_b_id, relationship_type, description)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![id, book_id, a, b, relationship_type, description],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(id)
+}
+
+pub fn update_character_relationship(
+    state: &DbState,
+    relationship_id: &str,
+    relationship_type: Option<&str>,
+    description: Option<&str>,
+) -> Result<(), String> {
+    let conn = state.db.conn();
+    if let Some(t) = relationship_type {
+        conn.execute(
+            "UPDATE character_relationships SET relationship_type = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![t, relationship_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if let Some(d) = description {
+        conn.execute(
+            "UPDATE character_relationships SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![d, relationship_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn delete_character_relationship(state: &DbState, relationship_id: &str) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute("DELETE FROM character_relationships WHERE id = ?1", [relationship_id])
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 

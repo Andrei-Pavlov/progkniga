@@ -365,6 +365,76 @@ pub fn delete_character(state: State<AppState>, character_id: String) -> Result<
 }
 
 #[tauri::command]
+pub fn update_location_map_position(
+    state: State<AppState>,
+    location_id: String,
+    map_x: f64,
+    map_y: f64,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::update_location_map_position(db, &location_id, map_x, map_y)
+}
+
+#[tauri::command]
+pub fn get_character_relationships(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<Vec<crate::db_commands::CharacterRelationship>, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::get_character_relationships(db, &book_id)
+}
+
+#[tauri::command]
+pub fn create_character_relationship(
+    state: State<AppState>,
+    book_id: String,
+    character_a_id: String,
+    character_b_id: String,
+    relationship_type: Option<String>,
+    description: Option<String>,
+) -> Result<String, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::create_character_relationship(
+        db,
+        &book_id,
+        &character_a_id,
+        &character_b_id,
+        relationship_type.as_deref(),
+        description.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn update_character_relationship(
+    state: State<AppState>,
+    relationship_id: String,
+    relationship_type: Option<String>,
+    description: Option<String>,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::update_character_relationship(
+        db,
+        &relationship_id,
+        relationship_type.as_deref(),
+        description.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn delete_character_relationship(
+    state: State<AppState>,
+    relationship_id: String,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::delete_character_relationship(db, &relationship_id)
+}
+
+#[tauri::command]
 pub fn delete_location(state: State<AppState>, location_id: String) -> Result<(), String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;

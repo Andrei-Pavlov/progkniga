@@ -181,11 +181,11 @@ export function LeftPanel() {
           ▶
         </button>
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {(['editor', 'mindmap', 'timeline'] as const).map((mode) => (
+          {(['editor', 'mindmap', 'timeline', 'relationships', 'worldmap'] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              title={mode === 'editor' ? 'Редактор' : mode === 'mindmap' ? 'MindMap' : 'Таймлайн'}
+              title={mode === 'editor' ? 'Редактор' : mode === 'mindmap' ? 'MindMap' : mode === 'timeline' ? 'Таймлайн' : mode === 'relationships' ? 'Отношения' : 'Карта мира'}
               style={{
                 padding: 8,
                 fontSize: 11,
@@ -196,7 +196,7 @@ export function LeftPanel() {
                 cursor: 'pointer',
               }}
             >
-              {mode === 'editor' ? '✎' : mode === 'mindmap' ? '⊙' : '⏱'}
+              {mode === 'editor' ? '✎' : mode === 'mindmap' ? '⊙' : mode === 'timeline' ? '⏱' : mode === 'relationships' ? '👥' : '🗺'}
             </button>
           ))}
         </div>
@@ -257,15 +257,15 @@ export function LeftPanel() {
       </div>
 
       <div style={{ padding: 12, borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          {(['editor', 'mindmap', 'timeline'] as const).map((mode) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {(['editor', 'mindmap', 'timeline', 'relationships', 'worldmap'] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
+              title={mode === 'relationships' ? 'Карта отношений' : mode === 'worldmap' ? 'Карта мира' : undefined}
               style={{
-                flex: 1,
-                padding: 8,
-                fontSize: 12,
+                padding: '8px 10px',
+                fontSize: 11,
                 background: viewMode === mode ? 'var(--accent)' : 'var(--bg-tertiary)',
                 color: viewMode === mode ? 'white' : 'var(--text-secondary)',
                 border: 'none',
@@ -273,7 +273,7 @@ export function LeftPanel() {
                 cursor: 'pointer',
               }}
             >
-              {mode === 'editor' ? 'Редактор' : mode === 'mindmap' ? 'MindMap' : 'Таймлайн'}
+              {mode === 'editor' ? 'Редактор' : mode === 'mindmap' ? 'MindMap' : mode === 'timeline' ? 'Таймлайн' : mode === 'relationships' ? 'Отношения' : 'Карта'}
             </button>
           ))}
         </div>

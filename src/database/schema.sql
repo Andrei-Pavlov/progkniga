@@ -45,13 +45,15 @@ CREATE TABLE IF NOT EXISTS characters (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Locations (hierarchical)
+-- Locations (hierarchical, map_x/map_y for world map)
 CREATE TABLE IF NOT EXISTS locations (
     id TEXT PRIMARY KEY,
     book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
     parent_id TEXT REFERENCES locations(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     description TEXT,
+    map_x REAL,
+    map_y REAL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -115,6 +117,20 @@ CREATE TABLE IF NOT EXISTS timeline_events (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Character relationships (for relationship map)
+CREATE TABLE IF NOT EXISTS character_relationships (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    character_a_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    character_b_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    relationship_type TEXT,
+    description TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(character_a_id, character_b_id),
+    CHECK(character_a_id < character_b_id)
+);
+
 -- MindMap nodes
 CREATE TABLE IF NOT EXISTS mindmap_nodes (
     id TEXT PRIMARY KEY,
@@ -176,6 +192,7 @@ CREATE INDEX IF NOT EXISTS idx_item_ownership_item ON item_ownership(item_id);
 CREATE INDEX IF NOT EXISTS idx_factions_book ON factions(book_id);
 CREATE INDEX IF NOT EXISTS idx_lore_book ON lore_entries(book_id);
 CREATE INDEX IF NOT EXISTS idx_timeline_book ON timeline_events(book_id);
+CREATE INDEX IF NOT EXISTS idx_character_relationships_book ON character_relationships(book_id);
 CREATE INDEX IF NOT EXISTS idx_mindmap_nodes_book ON mindmap_nodes(book_id);
 CREATE INDEX IF NOT EXISTS idx_mindmap_edges_book ON mindmap_edges(book_id);
 CREATE INDEX IF NOT EXISTS idx_entity_appearances_entity ON entity_appearances(entity_type, entity_id);

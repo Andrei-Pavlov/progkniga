@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 import { ChapterEditor } from './ChapterEditor';
 import { MindMapView } from './MindMapView';
 import { TimelineView } from './TimelineView';
+import { RelationshipMapView } from './RelationshipMapView';
+import { WorldMapView } from './WorldMapView';
 
 interface CenterPanelProps {
-  viewMode: 'editor' | 'mindmap' | 'timeline';
+  viewMode: 'editor' | 'mindmap' | 'timeline' | 'relationships' | 'worldmap';
   onExportReady?: (cb: (() => void) | null) => void;
   focusMode?: boolean;
 }
@@ -22,11 +24,9 @@ export function CenterPanel({ viewMode, onExportReady, focusMode }: CenterPanelP
     return () => onExportReady?.(null);
   }, [viewMode, onExportReady]);
 
-  if (viewMode === 'mindmap') {
-    return <MindMapView />;
-  }
-  if (viewMode === 'timeline') {
-    return <TimelineView />;
-  }
+  if (viewMode === 'mindmap') return <MindMapView />;
+  if (viewMode === 'timeline') return <TimelineView />;
+  if (viewMode === 'relationships') return <RelationshipMapView />;
+  if (viewMode === 'worldmap') return <WorldMapView />;
   return <ChapterEditor focusMode={focusMode} />;
 }
