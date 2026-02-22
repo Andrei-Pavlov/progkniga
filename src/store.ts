@@ -48,7 +48,7 @@ interface AppState {
   settingsOpen: boolean;
   leftPanelCollapsed: boolean;
   rightPanelCollapsed: boolean;
-  viewMode: 'editor' | 'mindmap' | 'timeline' | 'relationships' | 'worldmap';
+  viewMode: 'editor' | 'mindmap' | 'timeline';
   searchOpen: boolean;
   setAuthenticated: (value: boolean) => void;
   setDemoUser: (value: boolean) => void;
@@ -66,7 +66,7 @@ interface AppState {
   setSettingsOpen: (v: boolean) => void;
   setLeftPanelCollapsed: (v: boolean) => void;
   setRightPanelCollapsed: (v: boolean) => void;
-  setViewMode: (v: 'editor' | 'mindmap' | 'timeline' | 'relationships' | 'worldmap') => void;
+  setViewMode: (v: 'editor' | 'mindmap' | 'timeline') => void;
   setSearchOpen: (v: boolean) => void;
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "storyweaver-desktop",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Professional offline-first writing application",
   "type": "module",
   "scripts": {
