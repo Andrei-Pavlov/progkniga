@@ -107,6 +107,7 @@ export function RelationshipMapView() {
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRelId, setSelectedRelId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [connectMode, setConnectMode] = useState(false);
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
   const [editTypeA2B, setEditTypeA2B] = useState('');
@@ -249,6 +250,9 @@ export function RelationshipMapView() {
           .catch(console.error);
         setConnectSourceId(null);
         setConnectMode(false);
+      } else {
+        setSelectedNodeId(node.id);
+        setSelectedRelId(null);
       }
     },
     [connectMode, connectSourceId, currentBookId, relationships]
@@ -275,6 +279,7 @@ export function RelationshipMapView() {
   const handleLinkClick = useCallback((link: GraphLink) => {
     const r = link.relationship;
     setSelectedRelId(r.id);
+    setSelectedNodeId(null);
     setEditTypeA2B(r.relationship_type_a_to_b ?? r.relationship_type ?? '');
     setEditTypeB2A(r.relationship_type_b_to_a ?? '');
     setEditDescA2B(r.description_a_to_b ?? r.description ?? '');
@@ -335,9 +340,10 @@ export function RelationshipMapView() {
       const x = n.x ?? 0;
       const y = n.y ?? 0;
       const isConnectSource = connectSourceId === node.id;
+      const isSelected = selectedNodeId === node.id;
       const label = node.name;
-      const fontSize = 12 / globalScale;
-      ctx.font = `${fontSize}px Sans-Serif`;
+      const fontSize = Math.max(14, 16 / globalScale);
+      ctx.font = `600 ${fontSize}px Sans-Serif`;
 
       ctx.save();
       ctx.translate(x, y);
@@ -346,8 +352,8 @@ export function RelationshipMapView() {
       ctx.arc(0, -10, NODE_R, 0, 2 * Math.PI);
       ctx.fillStyle = 'var(--bg-tertiary)';
       ctx.fill();
-      ctx.strokeStyle = isConnectSource ? 'var(--accent)' : 'var(--accent)';
-      ctx.lineWidth = isConnectSource ? 4 : 2;
+      ctx.strokeStyle = isConnectSource || isSelected ? 'var(--accent)' : 'var(--border)';
+      ctx.lineWidth = isConnectSource || isSelected ? 4 : 2;
       ctx.stroke();
 
       if (node.avatar_url) {
@@ -382,15 +388,23 @@ export function RelationshipMapView() {
         ctx.fillText(label.charAt(0).toUpperCase(), 0, -10);
       }
 
+      const textWidth = ctx.measureText(label).width;
+      const pad = 6;
+      const boxW = textWidth + pad * 2;
+      const boxH = fontSize + pad;
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(-boxW / 2, NODE_R - 2, boxW, boxH);
+      ctx.strokeStyle = 'var(--accent)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-boxW / 2, NODE_R - 2, boxW, boxH);
       ctx.fillStyle = 'var(--text-primary)';
-      ctx.font = `${fontSize}px Sans-Serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(label, 0, NODE_R - 4);
+      ctx.fillText(label, 0, NODE_R + 2);
 
       ctx.restore();
     },
-    [connectSourceId]
+    [connectSourceId, selectedNodeId]
   );
 
   const nodePointerAreaPaint = useCallback(
@@ -402,6 +416,79 @@ export function RelationshipMapView() {
       ctx.arc(x, y - 10, NODE_R + 8, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
+    },
+    []
+  );
+
+  const linkCanvasObject = useCallback(
+    (
+      link: GraphLink & { source?: { x?: number; y?: number }; target?: { x?: number; y?: number } },
+      ctx: CanvasRenderingContext2D,
+      globalScale: number
+    ) => {
+      const src = link.source as { x?: number; y?: number };
+      const tgt = link.target as { x?: number; y?: number };
+      const x1 = src?.x ?? 0;
+      const y1 = src?.y ?? 0;
+      const x2 = tgt?.x ?? 0;
+      const y2 = tgt?.y ?? 0;
+      const r = link.relationship;
+      const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type;
+      const typeB2A = r.relationship_type_b_to_a;
+      const color =
+        EDGE_COLORS[typeA2B || ''] || EDGE_COLORS[typeB2A || ''] || '#94a3b8';
+      const isSelected = selectedRelId === link.id;
+      const lineW = isSelected ? 5 : 4;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineW;
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+      const label = [typeA2B, typeB2A].filter(Boolean).join(' ↔ ') || 'Связь';
+      const fontSize = Math.max(10, 12 / globalScale);
+      ctx.font = `${fontSize}px Sans-Serif`;
+      const tw = ctx.measureText(label).width;
+      const pad = 4;
+      ctx.fillStyle = 'rgba(0,0,0,0.8)';
+      ctx.fillRect(midX - tw / 2 - pad, midY - fontSize / 2 - pad, tw + pad * 2, fontSize + pad * 2);
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, midX, midY);
+      ctx.restore();
+    },
+    [selectedRelId]
+  );
+
+  const linkPointerAreaPaint = useCallback(
+    (
+      link: GraphLink & { source?: { x?: number; y?: number }; target?: { x?: number; y?: number } },
+      color: string,
+      ctx: CanvasRenderingContext2D,
+      _globalScale: number
+    ) => {
+      const src = link.source as { x?: number; y?: number };
+      const tgt = link.target as { x?: number; y?: number };
+      const x1 = src?.x ?? 0;
+      const y1 = src?.y ?? 0;
+      const x2 = tgt?.x ?? 0;
+      const y2 = tgt?.y ?? 0;
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+      const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+      ctx.save();
+      ctx.translate(midX, midY);
+      ctx.rotate(Math.atan2(y2 - y1, x2 - x1));
+      ctx.fillStyle = color;
+      ctx.fillRect(-len / 2, -12, len, 24);
+      ctx.restore();
     },
     []
   );
@@ -451,7 +538,7 @@ export function RelationshipMapView() {
         }}
       >
         <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-          Карта отношений: перетащите узлы, колёсико — зум. ПКМ по узлу — добавить аватар.
+          Клик по узлу — выбрать. Клик по линии — изменить связь. Перетащите узлы, колёсико — зум.
         </span>
         <button
           onClick={() => {
@@ -474,6 +561,43 @@ export function RelationshipMapView() {
               : 'Кликните первого персонажа'
             : 'Связать'}
         </button>
+        {selectedNodeId && (
+          <>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              {characters.find((c) => c.id === selectedNodeId)?.name}
+            </span>
+            <button
+              onClick={() => {
+                handleAddAvatar(selectedNodeId);
+              }}
+              style={{
+                padding: '6px 12px',
+                fontSize: 12,
+                background: 'var(--accent)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              Добавить аватар
+            </button>
+            <button
+              onClick={() => setSelectedNodeId(null)}
+              style={{
+                padding: '6px 12px',
+                fontSize: 12,
+                background: 'var(--bg-tertiary)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              Снять выбор
+            </button>
+          </>
+        )}
         {connectMode && (
           <button
             onClick={() => {
@@ -655,20 +779,18 @@ export function RelationshipMapView() {
             nodeCanvasObjectMode="replace"
             nodePointerAreaPaint={nodePointerAreaPaint}
             nodeLabel={nodeLabel}
-            linkColor={(link: GraphLink) => {
-              const r = link.relationship;
-              const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type;
-              const typeB2A = r.relationship_type_b_to_a;
-              return (
-                EDGE_COLORS[typeA2B || ''] || EDGE_COLORS[typeB2A || ''] || '#94a3b8'
-              );
-            }}
-            linkWidth={(link: GraphLink) => (selectedRelId === link.id ? 3 : 2)}
+            linkCanvasObject={linkCanvasObject}
+            linkCanvasObjectMode="replace"
+            linkPointerAreaPaint={linkPointerAreaPaint}
+            linkHoverPrecision={20}
             onNodeClick={(node) => handleNodeClick(node as GraphNode)}
             onNodeRightClick={(node, e) => handleNodeRightClick(node as GraphNode, e)}
             onNodeDragEnd={(node) => handleNodeDragEnd(node as GraphNode)}
             onLinkClick={(link) => handleLinkClick(link as GraphLink)}
-            onBackgroundClick={() => setSelectedRelId(null)}
+            onBackgroundClick={() => {
+              setSelectedRelId(null);
+              setSelectedNodeId(null);
+            }}
             backgroundColor="var(--bg-primary)"
             minZoom={0.2}
             maxZoom={4}
