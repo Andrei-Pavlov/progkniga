@@ -51,9 +51,14 @@ impl Database {
             ("characters", "faction_id", "ALTER TABLE characters ADD COLUMN faction_id TEXT REFERENCES factions(id)"),
             ("characters", "location_id", "ALTER TABLE characters ADD COLUMN location_id TEXT REFERENCES locations(id)"),
             ("characters", "role", "ALTER TABLE characters ADD COLUMN role TEXT"),
+            ("characters", "avatar_url", "ALTER TABLE characters ADD COLUMN avatar_url TEXT"),
             ("factions", "leader_character_id", "ALTER TABLE factions ADD COLUMN leader_character_id TEXT REFERENCES characters(id)"),
             ("locations", "map_x", "ALTER TABLE locations ADD COLUMN map_x REAL"),
             ("locations", "map_y", "ALTER TABLE locations ADD COLUMN map_y REAL"),
+            ("character_relationships", "relationship_type_a_to_b", "ALTER TABLE character_relationships ADD COLUMN relationship_type_a_to_b TEXT"),
+            ("character_relationships", "relationship_type_b_to_a", "ALTER TABLE character_relationships ADD COLUMN relationship_type_b_to_a TEXT"),
+            ("character_relationships", "description_a_to_b", "ALTER TABLE character_relationships ADD COLUMN description_a_to_b TEXT"),
+            ("character_relationships", "description_b_to_a", "ALTER TABLE character_relationships ADD COLUMN description_b_to_a TEXT"),
         ] {
             let exists: i32 = conn.query_row(
                 "SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?",
@@ -64,6 +69,12 @@ impl Database {
                 conn.execute(sql, [])?;
             }
         }
+        // Migrate old relationship_type/description to bidirectional columns
+        conn.execute(
+            "UPDATE character_relationships SET relationship_type_a_to_b = relationship_type, description_a_to_b = description
+             WHERE relationship_type_a_to_b IS NULL AND relationship_type IS NOT NULL",
+            [],
+        ).ok();
         Ok(())
     }
 

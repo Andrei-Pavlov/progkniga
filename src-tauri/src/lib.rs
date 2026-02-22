@@ -37,7 +37,9 @@ pub fn run() {
             commands::get_character_relationships,
             commands::create_character_relationship,
             commands::update_character_relationship,
+            commands::update_character_relationship_bidirectional,
             commands::delete_character_relationship,
+            commands::update_character_avatar,
             commands::get_items,
             commands::create_item,
             commands::update_item,
@@ -65,6 +67,7 @@ pub fn run() {
             commands::add_entity_appearance,
             commands::remove_entity_appearance,
             commands::write_file,
+            commands::read_file_as_base64,
             commands::get_mindmap_data,
             commands::save_mindmap_data,
         ])

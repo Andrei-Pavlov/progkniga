@@ -333,6 +333,24 @@ pub fn write_file(path: String, content_base64: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn read_file_as_base64(path: String) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    let ext = std::path::Path::new(&path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png");
+    let mime = match ext.to_lowercase().as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => "image/png",
+    };
+    Ok(format!("data:{};base64,{}", mime, b64))
+}
+
+#[tauri::command]
 pub fn update_character(
     state: State<AppState>,
     character_id: String,
@@ -421,6 +439,38 @@ pub fn update_character_relationship(
         &relationship_id,
         relationship_type.as_deref(),
         description.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn update_character_avatar(
+    state: State<AppState>,
+    character_id: String,
+    avatar_url: Option<String>,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::update_character_avatar(db, &character_id, avatar_url.as_deref())
+}
+
+#[tauri::command]
+pub fn update_character_relationship_bidirectional(
+    state: State<AppState>,
+    relationship_id: String,
+    relationship_type_a_to_b: Option<String>,
+    relationship_type_b_to_a: Option<String>,
+    description_a_to_b: Option<String>,
+    description_b_to_a: Option<String>,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::update_character_relationship_bidirectional(
+        db,
+        &relationship_id,
+        relationship_type_a_to_b,
+        relationship_type_b_to_a,
+        description_a_to_b,
+        description_b_to_a,
     )
 }
 
