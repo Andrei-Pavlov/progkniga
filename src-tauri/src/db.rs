@@ -61,6 +61,8 @@ impl Database {
             ("character_relationships", "relationship_type_b_to_a", "ALTER TABLE character_relationships ADD COLUMN relationship_type_b_to_a TEXT"),
             ("character_relationships", "description_a_to_b", "ALTER TABLE character_relationships ADD COLUMN description_a_to_b TEXT"),
             ("character_relationships", "description_b_to_a", "ALTER TABLE character_relationships ADD COLUMN description_b_to_a TEXT"),
+            ("character_relationships", "line_color", "ALTER TABLE character_relationships ADD COLUMN line_color TEXT"),
+            ("character_relationships", "line_type", "ALTER TABLE character_relationships ADD COLUMN line_type TEXT"),
         ] {
             let exists: i32 = conn.query_row(
                 "SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?",

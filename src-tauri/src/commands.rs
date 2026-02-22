@@ -473,6 +473,8 @@ pub fn update_character_relationship_bidirectional(
     relationship_type_b_to_a: Option<String>,
     description_a_to_b: Option<String>,
     description_b_to_a: Option<String>,
+    line_color: Option<String>,
+    line_type: Option<String>,
 ) -> Result<(), String> {
     let db_guard = state.db.lock().expect("db lock");
     let db = db_guard.as_ref().ok_or("No project open")?;
@@ -483,6 +485,8 @@ pub fn update_character_relationship_bidirectional(
         relationship_type_b_to_a,
         description_a_to_b,
         description_b_to_a,
+        line_color,
+        line_type,
     )
 }
 

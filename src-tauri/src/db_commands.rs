@@ -93,6 +93,10 @@ pub struct CharacterRelationship {
     pub description_a_to_b: Option<String>,
     #[serde(default)]
     pub description_b_to_a: Option<String>,
+    #[serde(default)]
+    pub line_color: Option<String>,
+    #[serde(default)]
+    pub line_type: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -582,7 +586,8 @@ pub fn get_character_relationships(
     let mut stmt = conn
         .prepare(
             "SELECT id, character_a_id, character_b_id, relationship_type, description,
-                    relationship_type_a_to_b, relationship_type_b_to_a, description_a_to_b, description_b_to_a
+                    relationship_type_a_to_b, relationship_type_b_to_a, description_a_to_b, description_b_to_a,
+                    line_color, line_type
              FROM character_relationships WHERE book_id = ?1",
         )
         .map_err(|e| e.to_string())?;
@@ -598,6 +603,8 @@ pub fn get_character_relationships(
                 relationship_type_b_to_a: row.get(6).ok().flatten(),
                 description_a_to_b: row.get(7).ok().flatten(),
                 description_b_to_a: row.get(8).ok().flatten(),
+                line_color: row.get(9).ok().flatten(),
+                line_type: row.get(10).ok().flatten(),
             })
         })
         .map_err(|e| e.to_string())?
@@ -666,6 +673,8 @@ pub fn update_character_relationship_bidirectional(
     relationship_type_b_to_a: Option<String>,
     description_a_to_b: Option<String>,
     description_b_to_a: Option<String>,
+    line_color: Option<String>,
+    line_type: Option<String>,
 ) -> Result<(), String> {
     let conn = state.db.conn();
     if let Some(v) = relationship_type_a_to_b {
@@ -696,6 +705,22 @@ pub fn update_character_relationship_bidirectional(
         let db_val: Option<&str> = if v.trim().is_empty() { None } else { Some(&v) };
         conn.execute(
             "UPDATE character_relationships SET description_b_to_a = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![db_val, relationship_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if let Some(v) = line_color {
+        let db_val: Option<&str> = if v.trim().is_empty() { None } else { Some(&v) };
+        conn.execute(
+            "UPDATE character_relationships SET line_color = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![db_val, relationship_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if let Some(v) = line_type {
+        let db_val: Option<&str> = if v.trim().is_empty() { None } else { Some(&v) };
+        conn.execute(
+            "UPDATE character_relationships SET line_type = ?1, updated_at = datetime('now') WHERE id = ?2",
             rusqlite::params![db_val, relationship_id],
         )
         .map_err(|e| e.to_string())?;
