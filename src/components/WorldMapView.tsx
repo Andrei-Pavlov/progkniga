@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useStore } from '../store';
+import { MapCanvas, useMapCanvas } from './MapCanvas';
 
 interface Location {
   id: string;
@@ -14,13 +15,89 @@ const DEFAULT_X = 400;
 const DEFAULT_Y = 300;
 const SAVE_DEBOUNCE = 500;
 
+function DraggableLocation({
+  loc,
+  pos,
+  dragging,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: {
+  loc: Location;
+  pos: { x: number; y: number };
+  dragging: boolean;
+  onDragStart: (e: React.MouseEvent, id: string, offsetX: number, offsetY: number) => void;
+  onDragMove: (id: string, x: number, y: number) => void;
+  onDragEnd: (id: string) => void;
+}) {
+  const ctx = useMapCanvas();
+  const dragStartRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
+
+  useEffect(() => {
+    if (!ctx || !dragging) return;
+    const handler = (e: MouseEvent) => {
+      if (dragStartRef.current) {
+        const { x, y } = ctx.screenToCanvas(e.clientX, e.clientY);
+        onDragMove(loc.id, x - dragStartRef.current.offsetX, y - dragStartRef.current.offsetY);
+      }
+    };
+    window.addEventListener('mousemove', handler);
+    return () => window.removeEventListener('mousemove', handler);
+  }, [ctx, dragging, loc.id, onDragMove]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const handler = () => {
+      onDragEnd(loc.id);
+      dragStartRef.current = null;
+    };
+    window.addEventListener('mouseup', handler);
+    return () => window.removeEventListener('mouseup', handler);
+  }, [dragging, loc.id, onDragEnd]);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!ctx) return;
+      const { x, y } = ctx.screenToCanvas(e.clientX, e.clientY);
+      const offsetX = x - pos.x;
+      const offsetY = y - pos.y;
+      dragStartRef.current = { offsetX, offsetY };
+      onDragStart(e, loc.id, offsetX, offsetY);
+    },
+    [ctx, loc.id, pos, onDragStart]
+  );
+
+  return (
+    <div
+      onMouseDown={handleMouseDown}
+      style={{
+        position: 'absolute',
+        left: pos.x,
+        top: pos.y,
+        transform: 'translate(-50%, -50%)',
+        padding: '8px 14px',
+        background: 'var(--bg-tertiary)',
+        border: '2px solid var(--accent)',
+        borderRadius: 8,
+        fontSize: 13,
+        color: 'var(--text-primary)',
+        cursor: dragging ? 'grabbing' : 'grab',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        userSelect: 'none',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {loc.name}
+    </div>
+  );
+}
+
 export function WorldMapView() {
   const currentBookId = useStore((s) => s.currentBookId);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [dragging, setDragging] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadLocations = useCallback(async () => {
@@ -40,10 +117,13 @@ export function WorldMapView() {
     loadLocations();
   }, [loadLocations]);
 
-  const getPos = (loc: Location) => ({
-    x: loc.map_x ?? DEFAULT_X + locations.indexOf(loc) * 80,
-    y: loc.map_y ?? DEFAULT_Y + (locations.indexOf(loc) % 3) * 60,
-  });
+  const getPos = useCallback(
+    (loc: Location) => ({
+      x: loc.map_x ?? DEFAULT_X + locations.indexOf(loc) * 80,
+      y: loc.map_y ?? DEFAULT_Y + (locations.indexOf(loc) % 3) * 60,
+    }),
+    [locations]
+  );
 
   const savePosition = useCallback(
     async (id: string, x: number, y: number) => {
@@ -55,9 +135,7 @@ export function WorldMapView() {
           mapY: y,
         });
         setLocations((prev) =>
-          prev.map((l) =>
-            l.id === id ? { ...l, map_x: x, map_y: y } : l
-          )
+          prev.map((l) => (l.id === id ? { ...l, map_x: x, map_y: y } : l))
         );
       } catch (e) {
         console.error(e);
@@ -66,73 +144,50 @@ export function WorldMapView() {
     [currentBookId]
   );
 
-  const getContainerRect = useCallback(() => {
-    if (!containerRef.current) return { left: 0, top: 0 };
-    const r = containerRef.current.getBoundingClientRect();
-    return { left: r.left, top: r.top };
+  const handleDragStart = useCallback((_e: React.MouseEvent, id: string, _ox: number, _oy: number) => {
+    setDragging(id);
   }, []);
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent, loc: Location) => {
-      e.preventDefault();
-      const pos = getPos(loc);
-      const rect = getContainerRect();
-      setDragging(loc.id);
-      setDragOffset({
-        x: e.clientX - rect.left - pos.x,
-        y: e.clientY - rect.top - pos.y,
-      });
-    },
-    [locations, getContainerRect]
-  );
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!dragging) return;
-      const loc = locations.find((l) => l.id === dragging);
-      if (!loc) return;
-      const rect = getContainerRect();
-      const newX = e.clientX - rect.left - dragOffset.x;
-      const newY = e.clientY - rect.top - dragOffset.y;
+  const handleDragMove = useCallback(
+    (id: string, x: number, y: number) => {
       setLocations((prev) =>
-        prev.map((l) =>
-          l.id === dragging ? { ...l, map_x: newX, map_y: newY } : l
-        )
+        prev.map((l) => (l.id === id ? { ...l, map_x: x, map_y: y } : l))
       );
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
-        savePosition(dragging, newX, newY);
+        savePosition(id, x, y);
         saveTimerRef.current = null;
       }, SAVE_DEBOUNCE);
     },
-    [dragging, dragOffset, locations, savePosition, getContainerRect]
+    [savePosition]
   );
 
-  const handleMouseUp = useCallback(() => {
-    if (dragging && saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      const loc = locations.find((l) => l.id === dragging);
-      if (loc && loc.map_x != null && loc.map_y != null) {
-        savePosition(dragging, loc.map_x, loc.map_y);
+  const handleDragEnd = useCallback(
+    (id: string) => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        const loc = locations.find((l) => l.id === id);
+        if (loc && loc.map_x != null && loc.map_y != null) {
+          savePosition(id, loc.map_x, loc.map_y);
+        }
+        saveTimerRef.current = null;
       }
-      saveTimerRef.current = null;
-    }
-    setDragging(null);
-  }, [dragging, locations, savePosition]);
-
-  useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, [handleMouseMove, handleMouseUp]);
+      setDragging(null);
+    },
+    [locations, savePosition]
+  );
 
   if (loading) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg-primary)',
+        }}
+      >
         <span style={{ color: 'var(--text-secondary)' }}>Загрузка...</span>
       </div>
     );
@@ -157,19 +212,9 @@ export function WorldMapView() {
           color: 'var(--text-secondary)',
         }}
       >
-        Карта мира: перетащите локации для размещения на карте
+        Карта мира: перетащите локации. Колёсико — зум, перетаскивание пустого места — панорама.
       </div>
-      <div
-        ref={containerRef}
-        style={{
-          flex: 1,
-          position: 'relative',
-          overflow: 'auto',
-          background:
-            'radial-gradient(circle at 50% 50%, var(--bg-secondary) 0%, var(--bg-primary) 100%)',
-        }}
-        onMouseLeave={handleMouseUp}
-      >
+      <MapCanvas>
         {locations.length === 0 ? (
           <div
             style={{
@@ -184,35 +229,52 @@ export function WorldMapView() {
             Добавьте локации в базе мира
           </div>
         ) : (
-          locations.map((loc) => {
-            const pos = getPos(loc);
-            return (
-              <div
+          <>
+            <svg
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+              }}
+            >
+              {locations
+                .filter((loc) => loc.parent_id)
+                .map((loc) => {
+                  const parent = locations.find((l) => l.id === loc.parent_id!);
+                  if (!parent) return null;
+                  const from = getPos(loc);
+                  const to = getPos(parent);
+                  return (
+                    <line
+                      key={`${loc.id}-${parent.id}`}
+                      x1={from.x}
+                      y1={from.y}
+                      x2={to.x}
+                      y2={to.y}
+                      stroke="var(--accent)"
+                      strokeWidth={2}
+                      strokeOpacity={0.6}
+                    />
+                  );
+                })}
+            </svg>
+            {locations.map((loc) => (
+              <DraggableLocation
                 key={loc.id}
-                onMouseDown={(e) => handleMouseDown(e, loc)}
-                style={{
-                  position: 'absolute',
-                  left: pos.x,
-                  top: pos.y,
-                  transform: 'translate(-50%, -50%)',
-                  padding: '8px 14px',
-                  background: 'var(--bg-tertiary)',
-                  border: '2px solid var(--accent)',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  color: 'var(--text-primary)',
-                  cursor: dragging === loc.id ? 'grabbing' : 'grab',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {loc.name}
-              </div>
-            );
-          })
+                loc={loc}
+                pos={getPos(loc)}
+                dragging={dragging === loc.id}
+                onDragStart={handleDragStart}
+                onDragMove={handleDragMove}
+                onDragEnd={handleDragEnd}
+              />
+            ))}
+          </>
         )}
-      </div>
+      </MapCanvas>
     </div>
   );
 }

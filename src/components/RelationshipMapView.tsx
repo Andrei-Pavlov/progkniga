@@ -1,23 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useStore } from '../store';
-import ReactFlow, {
-  Node,
-  Edge,
-  Controls,
-  Background,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  Connection,
-  NodeTypes,
-  BackgroundVariant,
-  Handle,
-  Position,
-  MarkerType,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+import { MapCanvas, useMapCanvas } from './MapCanvas';
 
 const RELATIONSHIP_TYPES = [
   'Друг',
@@ -94,53 +79,115 @@ interface Relationship {
   description_b_to_a?: string | null;
 }
 
-interface CharacterNodeData {
-  label: string;
-  avatarUrl?: string | null;
-  description?: string | null;
+const NODE_SIZE = 72;
+const SAVE_DEBOUNCE = 500;
+
+function DraggableCharacterNode({
+  char,
+  pos,
+  factionName,
+  locationName,
+  dragging,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onAddAvatar,
+  onNodeClick,
+  connectMode,
+  isConnectSource,
+}: {
+  char: Character;
+  pos: { x: number; y: number };
   factionName?: string;
   locationName?: string;
-  role?: string | null;
-  onAddAvatar?: (characterId: string) => void;
-  characterId?: string;
-}
-
-function CharacterNode({ data }: { data: CharacterNodeData }) {
+  dragging: boolean;
+  onDragStart: (e: React.MouseEvent, id: string, offsetX: number, offsetY: number) => void;
+  onDragMove: (id: string, x: number, y: number) => void;
+  onDragEnd: (id: string) => void;
+  onAddAvatar: (characterId: string) => void;
+  onNodeClick: (id: string) => void;
+  connectMode: boolean;
+  isConnectSource: boolean;
+}) {
+  const ctx = useMapCanvas();
+  const dragStartRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const [showTooltip, setShowTooltip] = useState(false);
-  const hasInfo = data.description || data.factionName || data.locationName || data.role;
+  const hasInfo = char.description || factionName || locationName || char.role;
+
+  useEffect(() => {
+    if (!ctx || !dragging) return;
+    const handler = (e: MouseEvent) => {
+      if (dragStartRef.current) {
+        const { x, y } = ctx.screenToCanvas(e.clientX, e.clientY);
+        onDragMove(char.id, x - dragStartRef.current.offsetX, y - dragStartRef.current.offsetY);
+      }
+    };
+    window.addEventListener('mousemove', handler);
+    return () => window.removeEventListener('mousemove', handler);
+  }, [ctx, dragging, char.id, onDragMove]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const handler = () => {
+      onDragEnd(char.id);
+      dragStartRef.current = null;
+    };
+    window.addEventListener('mouseup', handler);
+    return () => window.removeEventListener('mouseup', handler);
+  }, [dragging, char.id, onDragEnd]);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!ctx) return;
+      if (connectMode) {
+        onNodeClick(char.id);
+        return;
+      }
+      const { x, y } = ctx.screenToCanvas(e.clientX, e.clientY);
+      const offsetX = x - pos.x;
+      const offsetY = y - pos.y;
+      dragStartRef.current = { offsetX, offsetY };
+      onDragStart(e, char.id, offsetX, offsetY);
+    },
+    [ctx, char.id, pos, onDragStart, onNodeClick, connectMode]
+  );
 
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}
+      onMouseDown={handleMouseDown}
       onMouseEnter={() => setShowTooltip(!!hasInfo)}
       onMouseLeave={() => setShowTooltip(false)}
+      style={{
+        position: 'absolute',
+        left: pos.x,
+        top: pos.y,
+        transform: 'translate(-50%, -50%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        cursor: connectMode ? 'pointer' : dragging ? 'grabbing' : 'grab',
+        userSelect: 'none',
+      }}
     >
       <div
         style={{
           position: 'relative',
-          width: 72,
-          height: 72,
+          width: NODE_SIZE,
+          height: NODE_SIZE,
           borderRadius: '50%',
           overflow: 'hidden',
           background: 'var(--bg-tertiary)',
-          border: '3px solid var(--accent)',
+          border: isConnectSource ? '4px solid var(--accent)' : '3px solid var(--accent)',
           boxShadow: '0 2px 12px rgba(0,0,0,0.25)',
           flexShrink: 0,
         }}
       >
-        <Handle type="target" position={Position.Top} id="top" style={{ top: 0, width: 14, height: 14 }} />
-        <Handle type="target" position={Position.Left} id="left" style={{ left: 0, width: 14, height: 14 }} />
-        <Handle type="source" position={Position.Bottom} id="bottom" style={{ bottom: 0, width: 14, height: 14 }} />
-        <Handle type="source" position={Position.Right} id="right" style={{ right: 0, width: 14, height: 14 }} />
-        {data.avatarUrl ? (
+        {char.avatar_url ? (
           <img
-            src={data.avatarUrl}
+            src={char.avatar_url}
             alt=""
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
           <div
@@ -155,14 +202,14 @@ function CharacterNode({ data }: { data: CharacterNodeData }) {
               fontWeight: 600,
             }}
           >
-            {data.label.charAt(0).toUpperCase()}
+            {char.name.charAt(0).toUpperCase()}
           </div>
         )}
-        {data.onAddAvatar && data.characterId && (
+        {!connectMode && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              data.onAddAvatar?.(data.characterId!);
+              onAddAvatar(char.id);
             }}
             title="Добавить аватар"
             style={{
@@ -200,7 +247,7 @@ function CharacterNode({ data }: { data: CharacterNodeData }) {
           whiteSpace: 'nowrap',
         }}
       >
-        {data.label}
+        {char.name}
       </div>
       {showTooltip && hasInfo && (
         <div
@@ -220,11 +267,11 @@ function CharacterNode({ data }: { data: CharacterNodeData }) {
             whiteSpace: 'pre-wrap',
           }}
         >
-          {data.description && <div style={{ marginBottom: 6 }}>{data.description}</div>}
+          {char.description && <div style={{ marginBottom: 6 }}>{char.description}</div>}
           <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-            {data.factionName && <div>Фракция: {data.factionName}</div>}
-            {data.locationName && <div>Локация: {data.locationName}</div>}
-            {data.role && <div>Роль: {ROLE_LABELS[data.role] || data.role}</div>}
+            {factionName && <div>Фракция: {factionName}</div>}
+            {locationName && <div>Локация: {locationName}</div>}
+            {char.role && <div>Роль: {ROLE_LABELS[char.role] || char.role}</div>}
           </div>
         </div>
       )}
@@ -235,14 +282,19 @@ function CharacterNode({ data }: { data: CharacterNodeData }) {
 export function RelationshipMapView() {
   const currentBookId = useStore((s) => s.currentBookId);
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [factions, setFactions] = useState<{ id: string; name: string }[]>([]);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [selectedRelId, setSelectedRelId] = useState<string | null>(null);
+  const [connectMode, setConnectMode] = useState(false);
+  const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
   const [editTypeA2B, setEditTypeA2B] = useState('');
   const [editTypeB2A, setEditTypeB2A] = useState('');
   const [editDescA2B, setEditDescA2B] = useState('');
   const [editDescB2A, setEditDescB2A] = useState('');
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadData = useCallback(async () => {
     if (!currentBookId) return;
@@ -255,147 +307,41 @@ export function RelationshipMapView() {
         invoke<{ id: string; name: string }[]>('get_locations', { bookId: currentBookId }),
       ]);
       setCharacters(chars);
-
-      const factionMap = new Map(facs.map((f) => [f.id, f.name]));
-      const locationMap = new Map(locs.map((l) => [l.id, l.name]));
-
-      const posMap = new Map<string, { x: number; y: number }>();
-      let x = 0,
-        y = 0;
-      const getPos = (id: string) => {
-        if (!posMap.has(id)) {
-          posMap.set(id, { x: x * 180, y: y * 140 });
-          x++;
-          if (x > 4) {
-            x = 0;
-            y++;
-          }
-        }
-        return posMap.get(id)!;
-      };
-
-      rels.forEach((r) => {
-        getPos(r.character_a_id);
-        getPos(r.character_b_id);
-      });
-      chars.forEach((c) => getPos(c.id));
-
-      const nodeList: Node[] = chars.map((c) => {
-        const pos =
-          c.map_x != null && c.map_y != null
-            ? { x: c.map_x, y: c.map_y }
-            : getPos(c.id);
-        return {
-          id: c.id,
-          type: 'character',
-          position: pos,
-          data: {
-            label: c.name,
-            avatarUrl: c.avatar_url,
-            description: c.description,
-            factionName: c.faction_id ? factionMap.get(c.faction_id) : undefined,
-            locationName: c.location_id ? locationMap.get(c.location_id) : undefined,
-            role: c.role,
-          },
-        };
-      });
-
-      setNodes((prev) => {
-        const posMap = new Map(prev.map((n) => [n.id, n.position]));
-        return nodeList.map((n) => {
-          const savedPos = n.position;
-          const prevPos = posMap.get(n.id);
-          return {
-            ...n,
-            position: prevPos ?? savedPos,
-          };
-        });
-      });
-
-      const edgeList: Edge[] = rels.map((r) => {
-        const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type;
-        const typeB2A = r.relationship_type_b_to_a;
-        const color = EDGE_COLORS[typeA2B || ''] || EDGE_COLORS[typeB2A || ''] || '#94a3b8';
-        const labelParts = [typeA2B, typeB2A].filter(Boolean);
-        return {
-          id: r.id,
-          source: r.character_a_id,
-          target: r.character_b_id,
-          type: 'default',
-          markerEnd: { type: MarkerType.ArrowClosed, color },
-          style: { stroke: color, strokeWidth: 2 },
-          label: labelParts.length ? labelParts.join(' ↔ ') : '',
-          labelStyle: { fill: 'var(--text-primary)', fontSize: 11 },
-          labelBgStyle: { fill: 'var(--bg-tertiary)', fillOpacity: 0.9 },
-          labelBgPadding: [6, 4] as [number, number],
-          labelBgBorderRadius: 6,
-          data: {
-            typeA2B: typeA2B || undefined,
-            typeB2A: typeB2A || undefined,
-            descA2B: r.description_a_to_b ?? r.description ?? undefined,
-            descB2A: r.description_b_to_a ?? undefined,
-            characterAId: r.character_a_id,
-            characterBId: r.character_b_id,
-          },
-        };
-      });
-
-      setEdges(edgeList);
+      setRelationships(rels);
+      setFactions(facs);
+      setLocations(locs);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [currentBookId, setNodes, setEdges]);
-
-  const handleAddAvatar = useCallback(
-    async (characterId: string) => {
-      try {
-        const selected = await open({
-          multiple: false,
-          filters: [{ name: 'Изображения', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
-        });
-        if (selected && typeof selected === 'string') {
-          const dataUrl = await invoke<string>('read_file_as_base64', { path: selected });
-          await invoke('update_character_avatar', { characterId, avatarUrl: dataUrl });
-          setCharacters((prev) =>
-            prev.map((c) => (c.id === characterId ? { ...c, avatar_url: dataUrl } : c))
-          );
-          setNodes((nds) =>
-            nds.map((n) => {
-              if (n.id === characterId) {
-                return { ...n, data: { ...n.data, avatarUrl: dataUrl } };
-              }
-              return n;
-            })
-          );
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    },
-    [setNodes]
-  );
-
-  const nodeTypes: NodeTypes = useMemo(
-    () => ({
-      character: (props) => (
-        <CharacterNode
-          {...props}
-          data={{
-            ...props.data,
-            onAddAvatar: handleAddAvatar,
-            characterId: props.id,
-          }}
-        />
-      ),
-    }),
-    [handleAddAvatar]
-  );
+  }, [currentBookId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const factionMap = new Map(factions.map((f) => [f.id, f.name]));
+  const locationMap = new Map(locations.map((l) => [l.id, l.name]));
+
+  const getPos = useCallback(
+    (char: Character) => {
+      const idx = characters.indexOf(char);
+      const defaultX = 200 + (idx % 5) * 180;
+      const defaultY = 200 + Math.floor(idx / 5) * 140;
+      return {
+        x: char.map_x ?? defaultX,
+        y: char.map_y ?? defaultY,
+      };
+    },
+    [characters]
+  );
+
+  const posMap = useMemo(() => {
+    const m = new Map<string, { x: number; y: number }>();
+    characters.forEach((c) => m.set(c.id, getPos(c)));
+    return m;
+  }, [characters, getPos]);
 
   const savePosition = useCallback(
     async (characterId: string, x: number, y: number) => {
@@ -412,131 +358,171 @@ export function RelationshipMapView() {
     []
   );
 
-  const onNodeDragStop = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      savePosition(node.id, node.position.x, node.position.y);
+  const handleDragStart = useCallback((_e: React.MouseEvent, id: string, _ox: number, _oy: number) => {
+    setDragging(id);
+  }, []);
+
+  const handleDragMove = useCallback(
+    (id: string, x: number, y: number) => {
+      setCharacters((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, map_x: x, map_y: y } : c))
+      );
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        savePosition(id, x, y);
+        saveTimerRef.current = null;
+      }, SAVE_DEBOUNCE);
     },
     [savePosition]
   );
 
-  const onConnect = useCallback(
-    async (params: Connection) => {
-      if (!currentBookId || !params.source || !params.target) return;
-      if (params.source === params.target) return;
-      const sourceId = params.source;
-      const targetId = params.target;
-      const exists = edges.some(
-        (e) =>
-          (e.source === sourceId && e.target === targetId) ||
-          (e.source === targetId && e.target === sourceId)
+  const handleDragEnd = useCallback(
+    (id: string) => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        const char = characters.find((c) => c.id === id);
+        if (char && char.map_x != null && char.map_y != null) {
+          savePosition(id, char.map_x, char.map_y);
+        }
+        saveTimerRef.current = null;
+      }
+      setDragging(null);
+    },
+    [characters, savePosition]
+  );
+
+  const handleAddAvatar = useCallback(async (characterId: string) => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'Изображения', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+      });
+      if (selected && typeof selected === 'string') {
+        const dataUrl = await invoke<string>('read_file_as_base64', { path: selected });
+        await invoke('update_character_avatar', { characterId, avatarUrl: dataUrl });
+        setCharacters((prev) =>
+          prev.map((c) => (c.id === characterId ? { ...c, avatar_url: dataUrl } : c))
+        );
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const handleNodeClickInConnectMode = useCallback(
+    async (id: string) => {
+      if (!connectSourceId) {
+        setConnectSourceId(id);
+        return;
+      }
+      if (connectSourceId === id) {
+        setConnectSourceId(null);
+        return;
+      }
+      const exists = relationships.some(
+        (r) =>
+          (r.character_a_id === connectSourceId && r.character_b_id === id) ||
+          (r.character_a_id === id && r.character_b_id === connectSourceId)
       );
-      if (exists) return;
+      if (exists) {
+        setConnectSourceId(null);
+        setConnectMode(false);
+        return;
+      }
       try {
         const relId = await invoke<string>('create_character_relationship', {
           bookId: currentBookId,
-          characterAId: sourceId,
-          characterBId: targetId,
+          characterAId: connectSourceId,
+          characterBId: id,
           relationshipType: null,
           description: null,
         });
-        setEdges((eds) => [
-          ...eds,
+        setRelationships((prev) => [
+          ...prev,
           {
             id: relId,
-            source: sourceId,
-            target: targetId,
-            type: 'smoothstep',
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
-            style: { stroke: '#94a3b8', strokeWidth: 2 },
-            label: '',
-            labelStyle: { fill: 'var(--text-primary)', fontSize: 11 },
-            labelBgStyle: { fill: 'var(--bg-tertiary)', fillOpacity: 0.9 },
-            labelBgPadding: [6, 4] as [number, number],
-            labelBgBorderRadius: 6,
-            data: {
-              typeA2B: undefined,
-              typeB2A: undefined,
-              descA2B: undefined,
-              descB2A: undefined,
-              characterAId: sourceId < targetId ? sourceId : targetId,
-              characterBId: sourceId < targetId ? targetId : sourceId,
-            },
+            character_a_id: connectSourceId,
+            character_b_id: id,
+            relationship_type: null,
+            description: null,
+            relationship_type_a_to_b: null,
+            relationship_type_b_to_a: null,
+            description_a_to_b: null,
+            description_b_to_a: null,
           },
         ]);
       } catch (e) {
         console.error(e);
       }
+      setConnectSourceId(null);
+      setConnectMode(false);
     },
-    [currentBookId, edges, setEdges]
+    [connectSourceId, currentBookId, relationships]
   );
 
-  const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
-    setSelectedEdge(edge);
-    const d = (edge.data || {}) as Record<string, string | undefined>;
-    setEditTypeA2B(d.typeA2B || '');
-    setEditTypeB2A(d.typeB2A || '');
-    setEditDescA2B(d.descA2B || '');
-    setEditDescB2A(d.descB2A || '');
-  }, []);
+  const handlePaneClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (connectMode) return;
+      if ((e.target as HTMLElement).closest('[data-relationship-node]')) return;
+      setSelectedRelId(null);
+    },
+    [connectMode]
+  );
+
+  const selectedRel = relationships.find((r) => r.id === selectedRelId);
+  const edgeData = selectedRel
+    ? {
+        id: selectedRel.id,
+        charAId: selectedRel.character_a_id,
+        charBId: selectedRel.character_b_id,
+      }
+    : null;
+  const charAName = edgeData
+    ? characters.find((c) => c.id === edgeData.charAId)?.name ?? ''
+    : '';
+  const charBName = edgeData
+    ? characters.find((c) => c.id === edgeData.charBId)?.name ?? ''
+    : '';
 
   const saveEdgeEdit = useCallback(async () => {
-    if (!selectedEdge) return;
+    if (!selectedRelId) return;
     try {
       await invoke('update_character_relationship_bidirectional', {
-        relationship_id: selectedEdge.id,
+        relationship_id: selectedRelId,
         relationship_type_a_to_b: editTypeA2B.trim(),
         relationship_type_b_to_a: editTypeB2A.trim(),
         description_a_to_b: editDescA2B.trim(),
         description_b_to_a: editDescB2A.trim(),
       });
-      const labelParts = [editTypeA2B.trim(), editTypeB2A.trim()].filter(Boolean);
-      const newLabel = labelParts.length ? labelParts.join(' ↔ ') : '';
-      const newColor = EDGE_COLORS[editTypeA2B.trim()] || EDGE_COLORS[editTypeB2A.trim()] || '#94a3b8';
-
-      setEdges((eds) =>
-        eds.map((e) =>
-          e.id === selectedEdge.id
+      setRelationships((prev) =>
+        prev.map((r) =>
+          r.id === selectedRelId
             ? {
-                ...e,
-                label: newLabel,
-                data: {
-                  ...e.data,
-                  typeA2B: editTypeA2B.trim() || undefined,
-                  typeB2A: editTypeB2A.trim() || undefined,
-                  descA2B: editDescA2B.trim() || undefined,
-                  descB2A: editDescB2A.trim() || undefined,
-                },
-                style: {
-                  ...e.style,
-                  stroke: newColor,
-                },
-                markerEnd: { type: MarkerType.ArrowClosed, color: newColor },
+                ...r,
+                relationship_type_a_to_b: editTypeA2B.trim() || null,
+                relationship_type_b_to_a: editTypeB2A.trim() || null,
+                description_a_to_b: editDescA2B.trim() || null,
+                description_b_to_a: editDescB2A.trim() || null,
               }
-            : e
+            : r
         )
       );
-      setSelectedEdge(null);
+      setSelectedRelId(null);
     } catch (e) {
       console.error(e);
     }
-  }, [selectedEdge, editTypeA2B, editTypeB2A, editDescA2B, editDescB2A, setEdges]);
+  }, [selectedRelId, editTypeA2B, editTypeB2A, editDescA2B, editDescB2A]);
 
   const deleteSelectedEdge = useCallback(async () => {
-    if (!selectedEdge) return;
+    if (!selectedRelId) return;
     try {
-      await invoke('delete_character_relationship', { relationshipId: selectedEdge.id });
-      setEdges((eds) => eds.filter((e) => e.id !== selectedEdge.id));
-      setSelectedEdge(null);
+      await invoke('delete_character_relationship', { relationshipId: selectedRelId });
+      setRelationships((prev) => prev.filter((r) => r.id !== selectedRelId));
+      setSelectedRelId(null);
     } catch (e) {
       console.error(e);
     }
-  }, [selectedEdge, setEdges]);
-
-  const edgeData = selectedEdge?.data as { characterAId?: string; characterBId?: string } | undefined;
-  const idA = edgeData?.characterAId ?? selectedEdge?.source ?? '';
-  const idB = edgeData?.characterBId ?? selectedEdge?.target ?? '';
-  const charAName = characters.find((c) => c.id === idA)?.name ?? '';
-  const charBName = characters.find((c) => c.id === idB)?.name ?? '';
+  }, [selectedRelId]);
 
   if (loading) {
     return (
@@ -568,9 +554,49 @@ export function RelationshipMapView() {
         }}
       >
         <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-          Карта отношений: перетащите от одного персонажа к другому. Клик по узлу — подсказка. Кнопка + — аватар.
+          Карта отношений: перетащите узлы. Колёсико — зум, перетаскивание пустого места — панорама.
         </span>
-        {selectedEdge && (
+        <button
+          onClick={() => {
+            setConnectMode((v) => !v);
+            setConnectSourceId(null);
+          }}
+          style={{
+            padding: '6px 12px',
+            fontSize: 12,
+            background: connectMode ? 'var(--accent)' : 'var(--bg-tertiary)',
+            color: connectMode ? 'white' : 'var(--text-primary)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            cursor: 'pointer',
+          }}
+        >
+          {connectMode
+            ? connectSourceId
+              ? 'Кликните второго персонажа'
+              : 'Кликните первого персонажа'
+            : 'Связать'}
+        </button>
+        {connectMode && (
+          <button
+            onClick={() => {
+              setConnectMode(false);
+              setConnectSourceId(null);
+            }}
+            style={{
+              padding: '6px 12px',
+              fontSize: 12,
+              background: 'var(--bg-tertiary)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              cursor: 'pointer',
+            }}
+          >
+            Отмена
+          </button>
+        )}
+        {selectedRelId && (
           <div
             style={{
               display: 'flex',
@@ -683,7 +709,7 @@ export function RelationshipMapView() {
               Удалить
             </button>
             <button
-              onClick={() => setSelectedEdge(null)}
+              onClick={() => setSelectedRelId(null)}
               style={{
                 padding: '6px 14px',
                 fontSize: 13,
@@ -714,7 +740,7 @@ export function RelationshipMapView() {
           >
             Выберите книгу в левой панели
           </div>
-        ) : nodes.length === 0 ? (
+        ) : characters.length === 0 ? (
           <div
             style={{
               flex: 1,
@@ -730,32 +756,113 @@ export function RelationshipMapView() {
           >
             <div>Добавьте персонажей в базе мира (правая панель)</div>
             <div style={{ fontSize: 13, opacity: 0.8 }}>
-              Затем перетащите от одного персонажа к другому, чтобы создать связь
+              Нажмите «Связать» и выберите двух персонажей для создания связи
             </div>
           </div>
         ) : (
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeDragStop={onNodeDragStop}
-          onEdgeClick={onEdgeClick}
-          onPaneClick={() => setSelectedEdge(null)}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
-          connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 2 }}
-          nodesDraggable
-          nodesConnectable
-          elementsSelectable
-          style={{ background: 'var(--bg-primary)' }}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-          <Controls />
-          <MiniMap />
-        </ReactFlow>
+          <MapCanvas canvasWidth={2000} canvasHeight={2000}>
+            <div
+              onClick={handlePaneClick}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'auto',
+              }}
+            >
+              <svg
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                }}
+              >
+                {relationships.map((r) => {
+                  const a = posMap.get(r.character_a_id);
+                  const b = posMap.get(r.character_b_id);
+                  if (!a || !b) return null;
+                  const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type;
+                  const typeB2A = r.relationship_type_b_to_a;
+                  const color =
+                    EDGE_COLORS[typeA2B || ''] || EDGE_COLORS[typeB2A || ''] || '#94a3b8';
+                  return (
+                    <line
+                      key={r.id}
+                      x1={a.x}
+                      y1={a.y}
+                      x2={b.x}
+                      y2={b.y}
+                      stroke={color}
+                      strokeWidth={selectedRelId === r.id ? 4 : 2}
+                      strokeOpacity={selectedRelId === r.id ? 1 : 0.8}
+                    />
+                  );
+                })}
+              </svg>
+              <svg
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'stroke',
+                  cursor: 'pointer',
+                }}
+              >
+                {relationships.map((r) => {
+                  const a = posMap.get(r.character_a_id);
+                  const b = posMap.get(r.character_b_id);
+                  if (!a || !b) return null;
+                  return (
+                    <line
+                      key={r.id}
+                      x1={a.x}
+                      y1={a.y}
+                      x2={b.x}
+                      y2={b.y}
+                      stroke="transparent"
+                      strokeWidth={16}
+                      data-rel-id={r.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRelId(r.id);
+                        const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type ?? '';
+                        const typeB2A = r.relationship_type_b_to_a ?? '';
+                        setEditTypeA2B(typeA2B);
+                        setEditTypeB2A(typeB2A);
+                        setEditDescA2B(r.description_a_to_b ?? r.description ?? '');
+                        setEditDescB2A(r.description_b_to_a ?? '');
+                      }}
+                    />
+                  );
+                })}
+              </svg>
+              {characters.map((char) => (
+                <div key={char.id} data-relationship-node="1">
+                  <DraggableCharacterNode
+                    char={char}
+                    pos={getPos(char)}
+                    factionName={char.faction_id ? factionMap.get(char.faction_id) : undefined}
+                    locationName={char.location_id ? locationMap.get(char.location_id) : undefined}
+                    dragging={dragging === char.id}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                    onAddAvatar={handleAddAvatar}
+                    onNodeClick={handleNodeClickInConnectMode}
+                    connectMode={connectMode}
+                    isConnectSource={connectSourceId === char.id}
+                  />
+                </div>
+              ))}
+            </div>
+          </MapCanvas>
         )}
       </div>
     </div>
