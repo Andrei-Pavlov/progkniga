@@ -9,6 +9,7 @@ const TELEGRAM_CHANNEL = 'WeaverStory';
 
 export function LoginScreen() {
   const setAuthenticated = useStore((s) => s.setAuthenticated);
+  const setDemoUser = useStore((s) => s.setDemoUser);
   const { update, checking, downloading, checkForUpdates, installAndRelaunch } = useUpdater();
   const [loading, setLoading] = useState(false);
   const [appVersion, setAppVersion] = useState('');
@@ -40,6 +41,7 @@ export function LoginScreen() {
           }
           setLoading(false);
           setShowQr(false);
+          setDemoUser(false);
           setAuthenticated(true);
         }
       } catch (_) {}
@@ -79,6 +81,7 @@ export function LoginScreen() {
   };
 
   const handleDemoLogin = () => {
+    setDemoUser(true);
     setAuthenticated(true);
   };
 

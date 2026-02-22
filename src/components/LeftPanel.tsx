@@ -21,8 +21,8 @@ export function LeftPanel() {
   const setViewMode = useStore((s) => s.setViewMode);
   const currentProject = useStore((s) => s.currentProject);
   const currentBookId = useStore((s) => s.currentBookId);
-  const isAuthenticated = useStore((s) => s.isAuthenticated);
-  const isDemo = !isAuthenticated;
+  const isDemoUser = useStore((s) => s.isDemoUser);
+  const isDemo = isDemoUser;
   const setCurrentBookId = useStore((s) => s.setCurrentBookId);
   const selectedChapterId = useStore((s) => s.selectedChapterId);
   const setSelectedChapterId = useStore((s) => s.setSelectedChapterId);

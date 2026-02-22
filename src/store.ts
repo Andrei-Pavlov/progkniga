@@ -8,6 +8,7 @@ const DEMO_LIMITS = {
 
 const STORAGE_KEYS = {
   auth: 'storyweaver_auth',
+  demo: 'storyweaver_demo',
   project: 'storyweaver_project',
   book: 'storyweaver_book',
   font: 'storyweaver_font',
@@ -32,6 +33,7 @@ const ACCENT_COLORS: Record<AccentColor, { main: string; hover: string }> = {
 
 interface AppState {
   isAuthenticated: boolean;
+  isDemoUser: boolean;
   currentProject: string | null;
   currentBookId: string | null;
   selectedChapterId: string | null;
@@ -49,6 +51,7 @@ interface AppState {
   viewMode: 'editor' | 'mindmap' | 'timeline';
   searchOpen: boolean;
   setAuthenticated: (value: boolean) => void;
+  setDemoUser: (value: boolean) => void;
   setCurrentProject: (path: string | null) => void;
   setCurrentBookId: (id: string | null) => void;
   setSelectedChapterId: (id: string | null) => void;
@@ -72,6 +75,7 @@ const loadNum = (key: string, def: number) => Number(localStorage.getItem(key)) 
 
 export const useStore = create<AppState>((set) => ({
   isAuthenticated: load(STORAGE_KEYS.auth, '') === 'true',
+  isDemoUser: load(STORAGE_KEYS.demo, '') === 'true',
   currentProject: load(STORAGE_KEYS.project, ''),
   currentBookId: load(STORAGE_KEYS.book, ''),
   selectedChapterId: null,
@@ -92,6 +96,11 @@ export const useStore = create<AppState>((set) => ({
     if (value) localStorage.setItem(STORAGE_KEYS.auth, 'true');
     else localStorage.removeItem(STORAGE_KEYS.auth);
     set({ isAuthenticated: value });
+  },
+  setDemoUser: (value) => {
+    if (value) localStorage.setItem(STORAGE_KEYS.demo, 'true');
+    else localStorage.removeItem(STORAGE_KEYS.demo);
+    set({ isDemoUser: value });
   },
   setCurrentProject: (path) => {
     if (path) localStorage.setItem(STORAGE_KEYS.project, path);

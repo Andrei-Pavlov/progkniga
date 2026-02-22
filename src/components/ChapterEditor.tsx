@@ -17,8 +17,8 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
   const selectedChapterId = useStore((s) => s.selectedChapterId);
   const setSelectedChapterId = useStore((s) => s.setSelectedChapterId);
   const currentBookId = useStore((s) => s.currentBookId);
-  const isAuthenticated = useStore((s) => s.isAuthenticated);
-  const isDemo = !isAuthenticated;
+  const isDemoUser = useStore((s) => s.isDemoUser);
+  const isDemo = isDemoUser;
   const editorFontFamily = useStore((s) => s.editorFontFamily);
   const editorFontSize = useStore((s) => s.editorFontSize);
   const editorLineHeight = useStore((s) => s.editorLineHeight);

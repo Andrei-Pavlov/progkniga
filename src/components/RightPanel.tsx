@@ -69,8 +69,8 @@ const LORE_CATEGORIES = ['История', 'Магия', 'Культура', 'Г
 
 export function RightPanel() {
   const currentBookId = useStore((s) => s.currentBookId);
-  const isAuthenticated = useStore((s) => s.isAuthenticated);
-  const isDemo = !isAuthenticated;
+  const isDemoUser = useStore((s) => s.isDemoUser);
+  const isDemo = isDemoUser;
   const [characters, setCharacters] = useState<Character[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [items, setItems] = useState<Item[]>([]);
