@@ -52,6 +52,8 @@ impl Database {
             ("characters", "location_id", "ALTER TABLE characters ADD COLUMN location_id TEXT REFERENCES locations(id)"),
             ("characters", "role", "ALTER TABLE characters ADD COLUMN role TEXT"),
             ("characters", "avatar_url", "ALTER TABLE characters ADD COLUMN avatar_url TEXT"),
+            ("characters", "map_x", "ALTER TABLE characters ADD COLUMN map_x REAL"),
+            ("characters", "map_y", "ALTER TABLE characters ADD COLUMN map_y REAL"),
             ("factions", "leader_character_id", "ALTER TABLE factions ADD COLUMN leader_character_id TEXT REFERENCES characters(id)"),
             ("locations", "map_x", "ALTER TABLE locations ADD COLUMN map_x REAL"),
             ("locations", "map_y", "ALTER TABLE locations ADD COLUMN map_y REAL"),

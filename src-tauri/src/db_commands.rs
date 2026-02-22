@@ -38,6 +38,10 @@ pub struct Character {
     pub role: Option<String>,
     #[serde(default)]
     pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub map_x: Option<f64>,
+    #[serde(default)]
+    pub map_y: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -338,6 +342,21 @@ pub fn update_character_avatar(state: &DbState, character_id: &str, avatar_url: 
     Ok(())
 }
 
+pub fn update_character_map_position(
+    state: &DbState,
+    character_id: &str,
+    map_x: f64,
+    map_y: f64,
+) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute(
+        "UPDATE characters SET map_x = ?1, map_y = ?2, updated_at = datetime('now') WHERE id = ?3",
+        rusqlite::params![map_x, map_y, character_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 pub fn delete_chapter(state: &DbState, chapter_id: &str) -> Result<(), String> {
     let conn = state.db.conn();
     conn.execute(
@@ -398,7 +417,7 @@ pub fn update_chapter_title(state: &DbState, chapter_id: &str, title: &str) -> R
 pub fn get_characters(state: &DbState, book_id: &str) -> Result<Vec<Character>, String> {
     let conn = state.db.conn();
     let mut stmt = conn
-        .prepare("SELECT id, book_id, name, description, is_alive, faction_id, location_id, role, avatar_url FROM characters WHERE book_id = ?1 ORDER BY name")
+        .prepare("SELECT id, book_id, name, description, is_alive, faction_id, location_id, role, avatar_url, map_x, map_y FROM characters WHERE book_id = ?1 ORDER BY name")
         .map_err(|e| e.to_string())?;
     let chars = stmt
         .query_map([book_id], |row| {
@@ -412,6 +431,8 @@ pub fn get_characters(state: &DbState, book_id: &str) -> Result<Vec<Character>, 
                 location_id: row.get(6)?,
                 role: row.get(7)?,
                 avatar_url: row.get(8).ok().flatten(),
+                map_x: row.get(9).ok().flatten(),
+                map_y: row.get(10).ok().flatten(),
             })
         })
         .map_err(|e| e.to_string())?

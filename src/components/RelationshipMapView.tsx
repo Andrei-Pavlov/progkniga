@@ -78,6 +78,8 @@ interface Character {
   location_id?: string | null;
   role?: string | null;
   avatar_url?: string | null;
+  map_x?: number | null;
+  map_y?: number | null;
 }
 
 interface Relationship {
@@ -242,6 +244,110 @@ export function RelationshipMapView() {
   const [editDescA2B, setEditDescA2B] = useState('');
   const [editDescB2A, setEditDescB2A] = useState('');
 
+  const loadData = useCallback(async () => {
+    if (!currentBookId) return;
+    setLoading(true);
+    try {
+      const [chars, rels, facs, locs] = await Promise.all([
+        invoke<Character[]>('get_characters', { bookId: currentBookId }),
+        invoke<Relationship[]>('get_character_relationships', { bookId: currentBookId }),
+        invoke<{ id: string; name: string }[]>('get_factions', { bookId: currentBookId }),
+        invoke<{ id: string; name: string }[]>('get_locations', { bookId: currentBookId }),
+      ]);
+      setCharacters(chars);
+
+      const factionMap = new Map(facs.map((f) => [f.id, f.name]));
+      const locationMap = new Map(locs.map((l) => [l.id, l.name]));
+
+      const posMap = new Map<string, { x: number; y: number }>();
+      let x = 0,
+        y = 0;
+      const getPos = (id: string) => {
+        if (!posMap.has(id)) {
+          posMap.set(id, { x: x * 180, y: y * 140 });
+          x++;
+          if (x > 4) {
+            x = 0;
+            y++;
+          }
+        }
+        return posMap.get(id)!;
+      };
+
+      rels.forEach((r) => {
+        getPos(r.character_a_id);
+        getPos(r.character_b_id);
+      });
+      chars.forEach((c) => getPos(c.id));
+
+      const nodeList: Node[] = chars.map((c) => {
+        const pos =
+          c.map_x != null && c.map_y != null
+            ? { x: c.map_x, y: c.map_y }
+            : getPos(c.id);
+        return {
+          id: c.id,
+          type: 'character',
+          position: pos,
+          data: {
+            label: c.name,
+            avatarUrl: c.avatar_url,
+            description: c.description,
+            factionName: c.faction_id ? factionMap.get(c.faction_id) : undefined,
+            locationName: c.location_id ? locationMap.get(c.location_id) : undefined,
+            role: c.role,
+          },
+        };
+      });
+
+      setNodes((prev) => {
+        const posMap = new Map(prev.map((n) => [n.id, n.position]));
+        return nodeList.map((n) => {
+          const savedPos = n.position;
+          const prevPos = posMap.get(n.id);
+          return {
+            ...n,
+            position: prevPos ?? savedPos,
+          };
+        });
+      });
+
+      const edgeList: Edge[] = rels.map((r) => {
+        const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type;
+        const typeB2A = r.relationship_type_b_to_a;
+        const color = EDGE_COLORS[typeA2B || ''] || EDGE_COLORS[typeB2A || ''] || '#94a3b8';
+        const labelParts = [typeA2B, typeB2A].filter(Boolean);
+        return {
+          id: r.id,
+          source: r.character_a_id,
+          target: r.character_b_id,
+          type: 'default',
+          markerEnd: { type: MarkerType.ArrowClosed, color },
+          style: { stroke: color, strokeWidth: 2 },
+          label: labelParts.length ? labelParts.join(' ↔ ') : '',
+          labelStyle: { fill: 'var(--text-primary)', fontSize: 11 },
+          labelBgStyle: { fill: 'var(--bg-tertiary)', fillOpacity: 0.9 },
+          labelBgPadding: [6, 4] as [number, number],
+          labelBgBorderRadius: 6,
+          data: {
+            typeA2B: typeA2B || undefined,
+            typeB2A: typeB2A || undefined,
+            descA2B: r.description_a_to_b ?? r.description ?? undefined,
+            descB2A: r.description_b_to_a ?? undefined,
+            characterAId: r.character_a_id,
+            characterBId: r.character_b_id,
+          },
+        };
+      });
+
+      setEdges(edgeList);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentBookId, setNodes, setEdges]);
+
   const handleAddAvatar = useCallback(
     async (characterId: string) => {
       try {
@@ -287,106 +393,31 @@ export function RelationshipMapView() {
     [handleAddAvatar]
   );
 
-  const loadData = useCallback(async () => {
-    if (!currentBookId) return;
-    setLoading(true);
-    try {
-      const [chars, rels, facs, locs] = await Promise.all([
-        invoke<Character[]>('get_characters', { bookId: currentBookId }),
-        invoke<Relationship[]>('get_character_relationships', { bookId: currentBookId }),
-        invoke<{ id: string; name: string }[]>('get_factions', { bookId: currentBookId }),
-        invoke<{ id: string; name: string }[]>('get_locations', { bookId: currentBookId }),
-      ]);
-      setCharacters(chars);
-
-      const factionMap = new Map(facs.map((f) => [f.id, f.name]));
-      const locationMap = new Map(locs.map((l) => [l.id, l.name]));
-
-      const posMap = new Map<string, { x: number; y: number }>();
-      let x = 0,
-        y = 0;
-      const getPos = (id: string) => {
-        if (!posMap.has(id)) {
-          posMap.set(id, { x: x * 180, y: y * 140 });
-          x++;
-          if (x > 4) {
-            x = 0;
-            y++;
-          }
-        }
-        return posMap.get(id)!;
-      };
-
-      rels.forEach((r) => {
-        getPos(r.character_a_id);
-        getPos(r.character_b_id);
-      });
-      chars.forEach((c) => getPos(c.id));
-
-      const nodeList: Node[] = chars.map((c) => {
-        const pos = getPos(c.id);
-        return {
-          id: c.id,
-          type: 'character',
-          position: pos,
-          data: {
-            label: c.name,
-            avatarUrl: c.avatar_url,
-            description: c.description,
-            factionName: c.faction_id ? factionMap.get(c.faction_id) : undefined,
-            locationName: c.location_id ? locationMap.get(c.location_id) : undefined,
-            role: c.role,
-          },
-        };
-      });
-
-      setNodes((prev) => {
-        const posMap = new Map(prev.map((n) => [n.id, n.position]));
-        return nodeList.map((n) => ({
-          ...n,
-          position: posMap.get(n.id) ?? n.position,
-        }));
-      });
-
-      const edgeList: Edge[] = rels.map((r) => {
-        const typeA2B = r.relationship_type_a_to_b ?? r.relationship_type;
-        const typeB2A = r.relationship_type_b_to_a;
-        const color = EDGE_COLORS[typeA2B || ''] || EDGE_COLORS[typeB2A || ''] || '#94a3b8';
-        const labelParts = [typeA2B, typeB2A].filter(Boolean);
-        return {
-          id: r.id,
-          source: r.character_a_id,
-          target: r.character_b_id,
-          type: 'smoothstep',
-          markerEnd: { type: MarkerType.ArrowClosed, color },
-          style: { stroke: color, strokeWidth: 2 },
-          label: labelParts.length ? labelParts.join(' ↔ ') : '',
-          labelStyle: { fill: 'var(--text-primary)', fontSize: 11 },
-          labelBgStyle: { fill: 'var(--bg-tertiary)', fillOpacity: 0.9 },
-          labelBgPadding: [6, 4] as [number, number],
-          labelBgBorderRadius: 6,
-          data: {
-            typeA2B: typeA2B || undefined,
-            typeB2A: typeB2A || undefined,
-            descA2B: r.description_a_to_b ?? r.description ?? undefined,
-            descB2A: r.description_b_to_a ?? undefined,
-            characterAId: r.character_a_id,
-            characterBId: r.character_b_id,
-          },
-        };
-      });
-
-      setEdges(edgeList);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentBookId, setNodes, setEdges]);
-
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const savePosition = useCallback(
+    async (characterId: string, x: number, y: number) => {
+      try {
+        await invoke('update_character_map_position', {
+          character_id: characterId,
+          map_x: x,
+          map_y: y,
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    []
+  );
+
+  const onNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      savePosition(node.id, node.position.x, node.position.y);
+    },
+    [savePosition]
+  );
 
   const onConnect = useCallback(
     async (params: Connection) => {
@@ -709,6 +740,7 @@ export function RelationshipMapView() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDragStop={onNodeDragStop}
           onEdgeClick={onEdgeClick}
           onPaneClick={() => setSelectedEdge(null)}
           nodeTypes={nodeTypes}

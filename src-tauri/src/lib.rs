@@ -40,6 +40,7 @@ pub fn run() {
             commands::update_character_relationship_bidirectional,
             commands::delete_character_relationship,
             commands::update_character_avatar,
+            commands::update_character_map_position,
             commands::get_items,
             commands::create_item,
             commands::update_item,

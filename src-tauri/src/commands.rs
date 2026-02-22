@@ -443,6 +443,18 @@ pub fn update_character_relationship(
 }
 
 #[tauri::command]
+pub fn update_character_map_position(
+    state: State<AppState>,
+    character_id: String,
+    map_x: f64,
+    map_y: f64,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::update_character_map_position(db, &character_id, map_x, map_y)
+}
+
+#[tauri::command]
 pub fn update_character_avatar(
     state: State<AppState>,
     character_id: String,
