@@ -400,35 +400,53 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
           </button>
         </div>
       )}
-      <textarea
-        ref={textareaRef}
-        value={content}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (isDemo && v.length > DEMO_LIMITS.charsPerChapter) {
-            setContent(v.slice(0, DEMO_LIMITS.charsPerChapter));
-          } else {
-            setContent(v);
-          }
-        }}
-        placeholder={isDemo ? `Начните писать... (макс. ${DEMO_LIMITS.charsPerChapter} символов)` : 'Начните писать...'}
+      <div
         style={{
           flex: 1,
-          padding: 24,
-          margin: 0,
-          border: 'none',
-          background: 'transparent',
-          color: 'var(--text-primary)',
-          fontFamily: editorFontFamily,
-          fontSize: editorFontSize,
-          lineHeight: editorLineHeight,
-          resize: 'none',
-          outline: 'none',
-          maxWidth: editorTextMaxWidth || undefined,
-          marginLeft: editorTextMaxWidth ? 'auto' : undefined,
-          marginRight: editorTextMaxWidth ? 'auto' : undefined,
+          display: 'flex',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          minHeight: 0,
         }}
-      />
+      >
+        <div
+          style={{
+            width: editorTextMaxWidth ? `${editorTextMaxWidth}px` : '100%',
+            maxWidth: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            minWidth: 0,
+          }}
+        >
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (isDemo && v.length > DEMO_LIMITS.charsPerChapter) {
+                setContent(v.slice(0, DEMO_LIMITS.charsPerChapter));
+              } else {
+                setContent(v);
+              }
+            }}
+            placeholder={isDemo ? `Начните писать... (макс. ${DEMO_LIMITS.charsPerChapter} символов)` : 'Начните писать...'}
+            style={{
+              flex: 1,
+              padding: 24,
+              margin: 0,
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-primary)',
+              fontFamily: editorFontFamily,
+              fontSize: editorFontSize,
+              lineHeight: editorLineHeight,
+              resize: 'none',
+              outline: 'none',
+              minHeight: 0,
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

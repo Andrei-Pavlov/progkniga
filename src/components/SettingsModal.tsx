@@ -27,10 +27,13 @@ const ACCENT_OPTIONS: { value: AccentColor; label: string }[] = [
 
 const TEXT_WIDTH_OPTIONS = [
   { value: 0, label: 'На всю ширину' },
+  { value: 500, label: '500px' },
   { value: 600, label: '600px' },
   { value: 720, label: '720px' },
   { value: 800, label: '800px' },
   { value: 900, label: '900px' },
+  { value: 1000, label: '1000px' },
+  { value: 1200, label: '1200px' },
 ];
 
 type Tab = 'editor' | 'appearance' | 'about';
