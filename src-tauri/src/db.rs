@@ -79,6 +79,19 @@ impl Database {
              WHERE relationship_type_a_to_b IS NULL AND relationship_type IS NOT NULL",
             [],
         ).ok();
+        // Timeline event characters (many-to-many)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS timeline_event_characters (
+                event_id TEXT NOT NULL REFERENCES timeline_events(id) ON DELETE CASCADE,
+                character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+                PRIMARY KEY (event_id, character_id)
+            )",
+            [],
+        ).ok();
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_timeline_event_characters_event ON timeline_event_characters(event_id)",
+            [],
+        ).ok();
         Ok(())
     }
 

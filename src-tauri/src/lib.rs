@@ -55,6 +55,8 @@ pub fn run() {
             commands::update_chapters_order,
             commands::update_timeline_event,
             commands::delete_timeline_event,
+            commands::get_timeline_event_character_ids,
+            commands::set_timeline_event_characters,
             commands::update_chapter_title,
             commands::delete_character,
             commands::delete_location,

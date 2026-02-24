@@ -117,6 +117,14 @@ CREATE TABLE IF NOT EXISTS timeline_events (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Timeline event participants (many-to-many)
+CREATE TABLE IF NOT EXISTS timeline_event_characters (
+    event_id TEXT NOT NULL REFERENCES timeline_events(id) ON DELETE CASCADE,
+    character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    PRIMARY KEY (event_id, character_id)
+);
+CREATE INDEX IF NOT EXISTS idx_timeline_event_characters_event ON timeline_event_characters(event_id);
+
 -- Character relationships (for relationship map)
 CREATE TABLE IF NOT EXISTS character_relationships (
     id TEXT PRIMARY KEY,

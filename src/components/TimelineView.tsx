@@ -15,33 +15,58 @@ interface Chapter {
   title: string;
 }
 
+interface Character {
+  id: string;
+  name: string;
+}
+
 export function TimelineView() {
   const currentBookId = useStore((s) => s.currentBookId);
   const setSelectedChapterId = useStore((s) => s.setSelectedChapterId);
   const setViewMode = useStore((s) => s.setViewMode);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [eventCharacterIds, setEventCharacterIds] = useState<Record<string, string[]>>({});
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [selectedChapter, setSelectedChapter] = useState<string>('');
+  const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([]);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editChapterId, setEditChapterId] = useState<string>('');
+  const [editCharacterIds, setEditCharacterIds] = useState<string[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     if (!currentBookId) {
       setEvents([]);
       setChapters([]);
+      setCharacters([]);
+      setEventCharacterIds({});
       return;
     }
-    invoke<TimelineEvent[]>('get_timeline_events', { bookId: currentBookId })
-      .then(setEvents)
-      .catch(console.error);
-    invoke<Chapter[]>('get_chapters', { bookId: currentBookId })
-      .then(setChapters)
-      .catch(console.error);
+    try {
+      const [evs, chs, chrs] = await Promise.all([
+        invoke<TimelineEvent[]>('get_timeline_events', { bookId: currentBookId }),
+        invoke<Chapter[]>('get_chapters', { bookId: currentBookId }),
+        invoke<Character[]>('get_characters', { bookId: currentBookId }),
+      ]);
+      setEvents(evs);
+      setChapters(chs);
+      setCharacters(chrs);
+      const ids: Record<string, string[]> = {};
+      await Promise.all(
+        evs.map(async (ev) => {
+          const cids = await invoke<string[]>('get_timeline_event_character_ids', { eventId: ev.id });
+          ids[ev.id] = cids;
+        })
+      );
+      setEventCharacterIds(ids);
+    } catch (e) {
+      console.error(e);
+    }
   }, [currentBookId]);
 
   useEffect(() => {
@@ -51,14 +76,19 @@ export function TimelineView() {
   const handleAdd = async () => {
     if (!currentBookId || !newTitle.trim()) return;
     try {
-      await invoke('create_timeline_event', {
+      const eventId = await invoke<string>('create_timeline_event', {
         bookId: currentBookId,
         title: newTitle.trim(),
         description: newDesc.trim() || null,
         chapterId: selectedChapter || null,
       });
+      if (selectedCharacterIds.length > 0) {
+        await invoke('set_timeline_event_characters', { eventId, characterIds: selectedCharacterIds });
+      }
       setNewTitle('');
       setNewDesc('');
+      setSelectedChapter('');
+      setSelectedCharacterIds([]);
       loadData();
     } catch (e) {
       console.error(e);
@@ -73,6 +103,7 @@ export function TimelineView() {
         description: editDesc.trim() || null,
         chapterId: editChapterId || null,
       });
+      await invoke('set_timeline_event_characters', { eventId, characterIds: editCharacterIds });
       setEditingEventId(null);
       loadData();
     } catch (e) {
@@ -155,12 +186,12 @@ export function TimelineView() {
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Описание</label>
-            <input
-              type="text"
+            <textarea
               placeholder="Описание (опционально)"
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
-              style={{ ...commonInputStyle, minWidth: 180 }}
+              rows={2}
+              style={{ ...commonInputStyle, minWidth: 180, resize: 'vertical' }}
             />
           </div>
           <div>
@@ -177,6 +208,25 @@ export function TimelineView() {
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Персонажи (опционально)</label>
+            <select
+              multiple
+              value={selectedCharacterIds}
+              onChange={(e) => {
+                const opts = Array.from(e.target.selectedOptions, (o) => o.value);
+                setSelectedCharacterIds(opts);
+              }}
+              style={{ ...commonInputStyle, minWidth: 180, height: 80 }}
+            >
+              {characters.map((ch) => (
+                <option key={ch.id} value={ch.id}>
+                  {ch.name}
+                </option>
+              ))}
+            </select>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Ctrl+клик для выбора нескольких</span>
           </div>
           <button
             onClick={handleAdd}
@@ -215,23 +265,43 @@ export function TimelineView() {
                     <input
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
-                      placeholder="Название"
+                      placeholder="Название события"
                       style={commonInputStyle}
                     />
-                    <input
+                    <textarea
                       value={editDesc}
                       onChange={(e) => setEditDesc(e.target.value)}
-                      placeholder="Описание"
-                      style={commonInputStyle}
+                      placeholder="Описание (опционально)"
+                      rows={3}
+                      style={{ ...commonInputStyle, resize: 'vertical' }}
                     />
-                    <select value={editChapterId} onChange={(e) => setEditChapterId(e.target.value)} style={commonInputStyle}>
-                      <option value="">— Не привязано</option>
-                      {chapters.map((ch) => (
-                        <option key={ch.id} value={ch.id}>
-                          {ch.title}
-                        </option>
-                      ))}
-                    </select>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Глава</label>
+                      <select value={editChapterId} onChange={(e) => setEditChapterId(e.target.value)} style={commonInputStyle}>
+                        <option value="">— Не привязано</option>
+                        {chapters.map((ch) => (
+                          <option key={ch.id} value={ch.id}>
+                            {ch.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Персонажи (опционально)</label>
+                      <select
+                        multiple
+                        value={editCharacterIds}
+                        onChange={(e) => setEditCharacterIds(Array.from(e.target.selectedOptions, (o) => o.value))}
+                        style={{ ...commonInputStyle, width: '100%', height: 80 }}
+                      >
+                        {characters.map((ch) => (
+                          <option key={ch.id} value={ch.id}>
+                            {ch.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Ctrl+клик для выбора нескольких</span>
+                    </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         onClick={() => handleUpdate(ev.id)}
@@ -270,6 +340,13 @@ export function TimelineView() {
                         Глава: {chapters.find((c) => c.id === ev.chapter_id)?.title || '—'} →
                       </button>
                     )}
+                    {(eventCharacterIds[ev.id]?.length ?? 0) > 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+                        Персонажи: {(eventCharacterIds[ev.id] || [])
+                          .map((cid) => characters.find((c) => c.id === cid)?.name ?? '?')
+                          .join(', ')}
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                       <button
                         onClick={() => {
@@ -277,6 +354,7 @@ export function TimelineView() {
                           setEditTitle(ev.title);
                           setEditDesc(ev.description || '');
                           setEditChapterId(ev.chapter_id || '');
+                          setEditCharacterIds(eventCharacterIds[ev.id] || []);
                         }}
                         style={{ padding: '4px 10px', fontSize: 12, background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 4 }}
                       >

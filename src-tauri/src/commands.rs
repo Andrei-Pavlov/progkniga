@@ -579,6 +579,27 @@ pub fn delete_timeline_event(state: State<AppState>, event_id: String) -> Result
 }
 
 #[tauri::command]
+pub fn get_timeline_event_character_ids(
+    state: State<AppState>,
+    event_id: String,
+) -> Result<Vec<String>, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::get_timeline_event_character_ids(db, &event_id)
+}
+
+#[tauri::command]
+pub fn set_timeline_event_characters(
+    state: State<AppState>,
+    event_id: String,
+    character_ids: Vec<String>,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::set_timeline_event_characters(db, &event_id, &character_ids)
+}
+
+#[tauri::command]
 pub fn update_chapter_title(
     state: State<AppState>,
     chapter_id: String,

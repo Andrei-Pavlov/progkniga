@@ -947,6 +947,39 @@ pub fn delete_timeline_event(state: &DbState, event_id: &str) -> Result<(), Stri
     Ok(())
 }
 
+pub fn get_timeline_event_character_ids(state: &DbState, event_id: &str) -> Result<Vec<String>, String> {
+    let conn = state.db.conn();
+    let mut stmt = conn
+        .prepare("SELECT character_id FROM timeline_event_characters WHERE event_id = ?1 ORDER BY character_id")
+        .map_err(|e| e.to_string())?;
+    let ids = stmt
+        .query_map([event_id], |row| row.get(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(ids)
+}
+
+pub fn set_timeline_event_characters(
+    state: &DbState,
+    event_id: &str,
+    character_ids: &[String],
+) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute("DELETE FROM timeline_event_characters WHERE event_id = ?1", [event_id])
+        .map_err(|e| e.to_string())?;
+    for cid in character_ids {
+        if !cid.is_empty() {
+            conn.execute(
+                "INSERT INTO timeline_event_characters (event_id, character_id) VALUES (?1, ?2)",
+                rusqlite::params![event_id, cid],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 pub fn delete_character(state: &DbState, character_id: &str) -> Result<(), String> {
     let conn = state.db.conn();
     conn.execute("DELETE FROM characters WHERE id = ?1", [character_id])
