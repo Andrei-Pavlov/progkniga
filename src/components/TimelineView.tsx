@@ -211,22 +211,56 @@ export function TimelineView() {
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Персонажи (опционально)</label>
-            <select
-              multiple
-              value={selectedCharacterIds}
-              onChange={(e) => {
-                const opts = Array.from(e.target.selectedOptions, (o) => o.value);
-                setSelectedCharacterIds(opts);
+            <div
+              style={{
+                padding: 8,
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                maxHeight: 120,
+                overflowY: 'auto',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
               }}
-              style={{ ...commonInputStyle, minWidth: 180, height: 80 }}
             >
-              {characters.map((ch) => (
-                <option key={ch.id} value={ch.id}>
-                  {ch.name}
-                </option>
-              ))}
-            </select>
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Ctrl+клик для выбора нескольких</span>
+              {characters.length === 0 ? (
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Нет персонажей в базе мира</span>
+              ) : (
+                characters.map((ch) => (
+                  <label
+                    key={ch.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 10px',
+                      background: selectedCharacterIds.includes(ch.id) ? 'var(--accent)' : 'var(--bg-secondary)',
+                      color: selectedCharacterIds.includes(ch.id) ? 'white' : 'var(--text-primary)',
+                      borderRadius: 6,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      border: '1px solid transparent',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCharacterIds.includes(ch.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedCharacterIds((prev) => [...prev, ch.id]);
+                        } else {
+                          setSelectedCharacterIds((prev) => prev.filter((id) => id !== ch.id));
+                        }
+                      }}
+                      style={{ margin: 0 }}
+                    />
+                    {ch.name}
+                  </label>
+                ))
+              )}
+            </div>
           </div>
           <button
             onClick={handleAdd}
@@ -288,19 +322,56 @@ export function TimelineView() {
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Персонажи (опционально)</label>
-                      <select
-                        multiple
-                        value={editCharacterIds}
-                        onChange={(e) => setEditCharacterIds(Array.from(e.target.selectedOptions, (o) => o.value))}
-                        style={{ ...commonInputStyle, width: '100%', height: 80 }}
+                      <div
+                        style={{
+                          padding: 8,
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 6,
+                          maxHeight: 120,
+                          overflowY: 'auto',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                        }}
                       >
-                        {characters.map((ch) => (
-                          <option key={ch.id} value={ch.id}>
-                            {ch.name}
-                          </option>
-                        ))}
-                      </select>
-                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Ctrl+клик для выбора нескольких</span>
+                        {characters.length === 0 ? (
+                          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Нет персонажей в базе мира</span>
+                        ) : (
+                          characters.map((ch) => (
+                            <label
+                              key={ch.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                padding: '4px 10px',
+                                background: editCharacterIds.includes(ch.id) ? 'var(--accent)' : 'var(--bg-secondary)',
+                                color: editCharacterIds.includes(ch.id) ? 'white' : 'var(--text-primary)',
+                                borderRadius: 6,
+                                fontSize: 13,
+                                cursor: 'pointer',
+                                border: '1px solid transparent',
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={editCharacterIds.includes(ch.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setEditCharacterIds((prev) => [...prev, ch.id]);
+                                  } else {
+                                    setEditCharacterIds((prev) => prev.filter((id) => id !== ch.id));
+                                  }
+                                }}
+                                style={{ margin: 0 }}
+                              />
+                              {ch.name}
+                            </label>
+                          ))
+                        )}
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
