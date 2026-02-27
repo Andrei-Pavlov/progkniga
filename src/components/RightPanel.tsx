@@ -57,7 +57,7 @@ type EditingEntity =
   | { type: 'lore'; data: LoreEntry }
   | null;
 
-const ROLES = ['protagonist', 'antagonist', 'supporting', 'minor'] as const;
+const BASE_ROLES = ['protagonist', 'antagonist', 'supporting', 'minor'] as const;
 const ROLE_LABELS: Record<string, string> = {
   protagonist: 'Протагонист',
   antagonist: 'Антагонист',
@@ -105,6 +105,10 @@ export function RightPanel() {
   };
 
   const filteredCharacters = useMemo(() => filterList(characters), [characters, searchQuery]);
+  const customRoles = useMemo(() => {
+    const used = new Set(characters.map((c) => c.role).filter(Boolean) as string[]);
+    return [...used].filter((r) => !BASE_ROLES.includes(r as typeof BASE_ROLES[number])).sort();
+  }, [characters]);
   const filteredItems = useMemo(() => filterList(items), [items, searchQuery]);
   const filteredFactions = useMemo(() => filterList(factions), [factions, searchQuery]);
   const filteredLore = useMemo(() => {
@@ -290,6 +294,7 @@ export function RightPanel() {
           <CharactersTab
             characters={filteredCharacters}
             factions={factions}
+            customRoles={customRoles}
             locations={locations}
             editing={editing}
             setEditing={setEditing}
@@ -466,6 +471,7 @@ function CharactersTab({
   characters,
   factions,
   locations,
+  customRoles,
   editing,
   setEditing,
   loadData,
@@ -481,6 +487,7 @@ function CharactersTab({
   characters: Character[];
   factions: Faction[];
   locations: Location[];
+  customRoles: string[];
   editing: EditingEntity;
   setEditing: (e: EditingEntity) => void;
   loadData: () => void;
@@ -574,17 +581,45 @@ function CharactersTab({
               <div style={{ marginBottom: 8 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Роль:</span>
                 <select
-                  value={editing.data.role || ''}
-                  onChange={(e) => setEditing({ ...editing, data: { ...editing.data, role: e.target.value || undefined } })}
+                  value={
+                    editing.data.role === '__custom_input__' ? '__custom__' :
+                    editing.data.role && BASE_ROLES.includes(editing.data.role as typeof BASE_ROLES[number]) ? editing.data.role :
+                    editing.data.role && customRoles.includes(editing.data.role) ? editing.data.role :
+                    editing.data.role ? '__custom__' : ''
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '__custom__') {
+                      setEditing({ ...editing, data: { ...editing.data, role: '__custom_input__' } });
+                    } else {
+                      setEditing({ ...editing, data: { ...editing.data, role: v || undefined } });
+                    }
+                  }}
                   style={{ ...commonInputStyle, width: '100%' }}
                 >
                   <option value="">—</option>
-                  {ROLES.map((r) => (
+                  {BASE_ROLES.map((r) => (
                     <option key={r} value={r}>
                       {ROLE_LABELS[r]}
                     </option>
                   ))}
+                  {customRoles.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                  <option value="__custom__">+ Своя роль...</option>
                 </select>
+                {(editing.data.role === '__custom_input__' || (editing.data.role && !BASE_ROLES.includes(editing.data.role as typeof BASE_ROLES[number]) && !customRoles.includes(editing.data.role))) && (
+                  <input
+                    type="text"
+                    placeholder="Введите роль"
+                    value={editing.data.role === '__custom_input__' ? '' : (editing.data.role || '')}
+                    onChange={(e) => setEditing({ ...editing, data: { ...editing.data, role: e.target.value.trim() || '__custom_input__' } })}
+                    style={{ ...commonInputStyle, width: '100%', marginTop: 6 }}
+                    autoFocus={editing.data.role === '__custom_input__'}
+                  />
+                )}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
@@ -596,7 +631,7 @@ function CharactersTab({
                       isAlive: editing.data.is_alive,
                       factionId: editing.data.faction_id ?? null,
                       locationId: editing.data.location_id ?? null,
-                      role: editing.data.role ?? null,
+                      role: editing.data.role === '__custom_input__' ? null : (editing.data.role ?? null),
                     }).then(() => {
                       setEditing(null);
                       loadData();

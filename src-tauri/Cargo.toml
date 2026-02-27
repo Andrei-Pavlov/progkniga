@@ -1,6 +1,6 @@
 [package]
 name = "storyweaver_desktop"
-version = "1.0.17"
+version = "1.0.18"
 description = "StoryWeaver - Professional offline-first writing application"
 authors = ["StoryWeaver"]
 license = ""
