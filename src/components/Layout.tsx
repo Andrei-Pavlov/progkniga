@@ -5,6 +5,7 @@ import { RightPanel } from './RightPanel';
 import { MainMenu } from './MainMenu';
 import { SettingsModal } from './SettingsModal';
 import { SearchOverlay } from './SearchOverlay';
+import { BongoCat } from './BongoCat';
 import { ToastContainer } from './Toast';
 import { useStore } from '../store';
 
@@ -71,6 +72,7 @@ export function Layout() {
       <SettingsModal />
       <SearchOverlay />
       <ToastContainer />
+      <BongoCat />
     </div>
   );
 }

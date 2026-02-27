@@ -49,6 +49,7 @@ export function SettingsModal() {
   const theme = useStore((s) => s.theme);
   const accent = useStore((s) => s.accent);
   const focusMode = useStore((s) => s.focusMode);
+  const bongoCatEnabled = useStore((s) => s.bongoCatEnabled);
   const setEditorFontFamily = useStore((s) => s.setEditorFontFamily);
   const setEditorFontSize = useStore((s) => s.setEditorFontSize);
   const setEditorLineHeight = useStore((s) => s.setEditorLineHeight);
@@ -57,6 +58,7 @@ export function SettingsModal() {
   const setTheme = useStore((s) => s.setTheme);
   const setAccent = useStore((s) => s.setAccent);
   const setFocusMode = useStore((s) => s.setFocusMode);
+  const setBongoCatEnabled = useStore((s) => s.setBongoCatEnabled);
 
   const [tab, setTab] = useState<Tab>('editor');
   const [appVersion, setAppVersion] = useState('1.0.4');
@@ -216,6 +218,10 @@ export function SettingsModal() {
                 ))}
               </select>
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={bongoCatEnabled} onChange={(e) => setBongoCatEnabled(e.target.checked)} />
+              <span style={{ fontSize: 13 }}>Bongo Cat (котик бьёт по клавиатуре при наборе текста)</span>
+            </label>
           </div>
         )}
 

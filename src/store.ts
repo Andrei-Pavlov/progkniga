@@ -19,6 +19,7 @@ const STORAGE_KEYS = {
   textMaxWidth: 'storyweaver_textMaxWidth',
   autoSaveDelay: 'storyweaver_autoSaveDelay',
   focusMode: 'storyweaver_focusMode',
+  bongoCat: 'storyweaver_bongoCat',
 } as const;
 
 export type Theme = 'dark' | 'light' | 'system';
@@ -45,6 +46,7 @@ interface AppState {
   theme: Theme;
   accent: AccentColor;
   focusMode: boolean;
+  bongoCatEnabled: boolean;
   settingsOpen: boolean;
   leftPanelCollapsed: boolean;
   rightPanelCollapsed: boolean;
@@ -63,6 +65,7 @@ interface AppState {
   setTheme: (v: Theme) => void;
   setAccent: (v: AccentColor) => void;
   setFocusMode: (v: boolean) => void;
+  setBongoCatEnabled: (v: boolean) => void;
   setSettingsOpen: (v: boolean) => void;
   setLeftPanelCollapsed: (v: boolean) => void;
   setRightPanelCollapsed: (v: boolean) => void;
@@ -87,6 +90,7 @@ export const useStore = create<AppState>((set) => ({
   theme: (load(STORAGE_KEYS.theme, 'dark') as Theme) || 'dark',
   accent: (load(STORAGE_KEYS.accent, 'indigo') as AccentColor) || 'indigo',
   focusMode: load(STORAGE_KEYS.focusMode, '') === 'true',
+  bongoCatEnabled: load(STORAGE_KEYS.bongoCat, '') === 'true',
   settingsOpen: false,
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
@@ -146,6 +150,10 @@ export const useStore = create<AppState>((set) => ({
   setFocusMode: (v) => {
     localStorage.setItem(STORAGE_KEYS.focusMode, v ? 'true' : '');
     set({ focusMode: v });
+  },
+  setBongoCatEnabled: (v) => {
+    localStorage.setItem(STORAGE_KEYS.bongoCat, v ? 'true' : '');
+    set({ bongoCatEnabled: v });
   },
   setSettingsOpen: (v) => set({ settingsOpen: v }),
   setLeftPanelCollapsed: (v) => set({ leftPanelCollapsed: v }),
