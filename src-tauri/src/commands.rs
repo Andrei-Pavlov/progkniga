@@ -707,3 +707,88 @@ pub fn save_mindmap_data(
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::save_mindmap_data(db, &book_id, &nodes, &edges)
 }
+
+// --- Book languages ---
+
+#[tauri::command]
+pub fn get_book_languages(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<Vec<crate::db_commands::BookLanguage>, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::get_book_languages(db, &book_id)
+}
+
+#[tauri::command]
+pub fn create_book_language(
+    state: State<AppState>,
+    book_id: String,
+    name: String,
+    description: Option<String>,
+) -> Result<String, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::create_book_language(db, &book_id, &name, description.as_deref())
+}
+
+#[tauri::command]
+pub fn update_book_language(
+    state: State<AppState>,
+    language_id: String,
+    name: Option<String>,
+    description: Option<Option<String>>,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::update_book_language(db, &language_id, name.as_deref(), description)
+}
+
+#[tauri::command]
+pub fn delete_book_language(state: State<AppState>, language_id: String) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::delete_book_language(db, &language_id)
+}
+
+#[tauri::command]
+pub fn get_book_language_mappings(
+    state: State<AppState>,
+    language_id: String,
+) -> Result<Vec<crate::db_commands::BookLanguageMapping>, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::get_book_language_mappings(db, &language_id)
+}
+
+#[tauri::command]
+pub fn set_book_language_mappings(
+    state: State<AppState>,
+    language_id: String,
+    mappings: Vec<(String, String)>,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::set_book_language_mappings(db, &language_id, &mappings)
+}
+
+#[tauri::command]
+pub fn get_book_language_words(
+    state: State<AppState>,
+    language_id: String,
+) -> Result<Vec<crate::db_commands::BookLanguageWord>, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::get_book_language_words(db, &language_id)
+}
+
+#[tauri::command]
+pub fn set_book_language_words(
+    state: State<AppState>,
+    language_id: String,
+    words: Vec<(String, String)>,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::set_book_language_words(db, &language_id, &words)
+}

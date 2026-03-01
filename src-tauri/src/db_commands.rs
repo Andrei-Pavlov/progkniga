@@ -1024,6 +1024,30 @@ pub fn delete_faction(state: &DbState, faction_id: &str) -> Result<(), String> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct BookLanguage {
+    pub id: String,
+    pub book_id: String,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BookLanguageMapping {
+    pub id: String,
+    pub language_id: String,
+    pub source_char: String,
+    pub symbol: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BookLanguageWord {
+    pub id: String,
+    pub language_id: String,
+    pub source_word: String,
+    pub symbol: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LoreEntry {
     pub id: String,
     pub book_id: String,
@@ -1131,6 +1155,166 @@ pub fn delete_lore_entry(state: &DbState, lore_id: &str) -> Result<(), String> {
     let conn = state.db.conn();
     conn.execute("DELETE FROM lore_entries WHERE id = ?1", [lore_id])
         .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// --- Book languages ---
+
+pub fn get_book_languages(state: &DbState, book_id: &str) -> Result<Vec<BookLanguage>, String> {
+    let conn = state.db.conn();
+    let mut stmt = conn
+        .prepare("SELECT id, book_id, name, description FROM book_languages WHERE book_id = ?1 ORDER BY name")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([book_id], |row| {
+            Ok(BookLanguage {
+                id: row.get(0)?,
+                book_id: row.get(1)?,
+                name: row.get(2)?,
+                description: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+pub fn create_book_language(
+    state: &DbState,
+    book_id: &str,
+    name: &str,
+    description: Option<&str>,
+) -> Result<String, String> {
+    let id = Uuid::new_v4().to_string();
+    let conn = state.db.conn();
+    conn.execute(
+        "INSERT INTO book_languages (id, book_id, name, description) VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![id, book_id, name, description],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(id)
+}
+
+pub fn update_book_language(
+    state: &DbState,
+    language_id: &str,
+    name: Option<&str>,
+    description: Option<Option<String>>,
+) -> Result<(), String> {
+    let conn = state.db.conn();
+    if let Some(n) = name {
+        conn.execute(
+            "UPDATE book_languages SET name = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![n, language_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if let Some(d) = description {
+        let val: Option<&str> = d.as_deref();
+        conn.execute(
+            "UPDATE book_languages SET description = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![val, language_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn delete_book_language(state: &DbState, language_id: &str) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute("DELETE FROM book_languages WHERE id = ?1", [language_id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn get_book_language_mappings(
+    state: &DbState,
+    language_id: &str,
+) -> Result<Vec<BookLanguageMapping>, String> {
+    let conn = state.db.conn();
+    let mut stmt = conn
+        .prepare("SELECT id, language_id, source_char, symbol FROM book_language_mappings WHERE language_id = ?1 ORDER BY source_char")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([language_id], |row| {
+            Ok(BookLanguageMapping {
+                id: row.get(0)?,
+                language_id: row.get(1)?,
+                source_char: row.get(2)?,
+                symbol: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+pub fn set_book_language_mappings(
+    state: &DbState,
+    language_id: &str,
+    mappings: &[(String, String)],
+) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute("DELETE FROM book_language_mappings WHERE language_id = ?1", [language_id])
+        .map_err(|e| e.to_string())?;
+    for (source_char, symbol) in mappings {
+        if source_char.is_empty() && symbol.is_empty() {
+            continue;
+        }
+        let id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO book_language_mappings (id, language_id, source_char, symbol) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![id, language_id, source_char, symbol],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn get_book_language_words(
+    state: &DbState,
+    language_id: &str,
+) -> Result<Vec<BookLanguageWord>, String> {
+    let conn = state.db.conn();
+    let mut stmt = conn
+        .prepare("SELECT id, language_id, source_word, symbol FROM book_language_words WHERE language_id = ?1 ORDER BY source_word")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([language_id], |row| {
+            Ok(BookLanguageWord {
+                id: row.get(0)?,
+                language_id: row.get(1)?,
+                source_word: row.get(2)?,
+                symbol: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+pub fn set_book_language_words(
+    state: &DbState,
+    language_id: &str,
+    words: &[(String, String)],
+) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute("DELETE FROM book_language_words WHERE language_id = ?1", [language_id])
+        .map_err(|e| e.to_string())?;
+    for (source_word, symbol) in words {
+        if source_word.trim().is_empty() {
+            continue;
+        }
+        let id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO book_language_words (id, language_id, source_word, symbol) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![id, language_id, source_word, symbol],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 

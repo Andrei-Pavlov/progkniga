@@ -20,6 +20,7 @@ const STORAGE_KEYS = {
   autoSaveDelay: 'storyweaver_autoSaveDelay',
   focusMode: 'storyweaver_focusMode',
   bongoCat: 'storyweaver_bongoCat',
+  bongoCatPosition: 'storyweaver_bongoCatPosition',
 } as const;
 
 export type Theme = 'dark' | 'light' | 'system';
@@ -47,6 +48,7 @@ interface AppState {
   accent: AccentColor;
   focusMode: boolean;
   bongoCatEnabled: boolean;
+  bongoCatPosition: { x: number; y: number } | null;
   settingsOpen: boolean;
   leftPanelCollapsed: boolean;
   rightPanelCollapsed: boolean;
@@ -66,6 +68,7 @@ interface AppState {
   setAccent: (v: AccentColor) => void;
   setFocusMode: (v: boolean) => void;
   setBongoCatEnabled: (v: boolean) => void;
+  setBongoCatPosition: (v: { x: number; y: number } | null) => void;
   setSettingsOpen: (v: boolean) => void;
   setLeftPanelCollapsed: (v: boolean) => void;
   setRightPanelCollapsed: (v: boolean) => void;
@@ -91,6 +94,15 @@ export const useStore = create<AppState>((set) => ({
   accent: (load(STORAGE_KEYS.accent, 'indigo') as AccentColor) || 'indigo',
   focusMode: load(STORAGE_KEYS.focusMode, '') === 'true',
   bongoCatEnabled: load(STORAGE_KEYS.bongoCat, '') === 'true',
+  bongoCatPosition: (() => {
+    const s = localStorage.getItem(STORAGE_KEYS.bongoCatPosition);
+    if (!s) return null;
+    try {
+      const p = JSON.parse(s) as { x: number; y: number };
+      if (typeof p.x === 'number' && typeof p.y === 'number') return p;
+    } catch {}
+    return null;
+  })(),
   settingsOpen: false,
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
@@ -154,6 +166,11 @@ export const useStore = create<AppState>((set) => ({
   setBongoCatEnabled: (v) => {
     localStorage.setItem(STORAGE_KEYS.bongoCat, v ? 'true' : '');
     set({ bongoCatEnabled: v });
+  },
+  setBongoCatPosition: (v) => {
+    if (v) localStorage.setItem(STORAGE_KEYS.bongoCatPosition, JSON.stringify(v));
+    else localStorage.removeItem(STORAGE_KEYS.bongoCatPosition);
+    set({ bongoCatPosition: v });
   },
   setSettingsOpen: (v) => set({ settingsOpen: v }),
   setLeftPanelCollapsed: (v) => set({ leftPanelCollapsed: v }),

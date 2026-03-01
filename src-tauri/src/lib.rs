@@ -73,6 +73,14 @@ pub fn run() {
             commands::read_file_as_base64,
             commands::get_mindmap_data,
             commands::save_mindmap_data,
+            commands::get_book_languages,
+            commands::create_book_language,
+            commands::update_book_language,
+            commands::delete_book_language,
+            commands::get_book_language_mappings,
+            commands::set_book_language_mappings,
+            commands::get_book_language_words,
+            commands::set_book_language_words,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -92,6 +92,43 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_timeline_event_characters_event ON timeline_event_characters(event_id)",
             [],
         ).ok();
+        // Book languages
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS book_languages (
+                id TEXT PRIMARY KEY,
+                book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                description TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            [],
+        ).ok();
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS book_language_mappings (
+                id TEXT PRIMARY KEY,
+                language_id TEXT NOT NULL REFERENCES book_languages(id) ON DELETE CASCADE,
+                source_char TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(language_id, source_char)
+            )",
+            [],
+        ).ok();
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS book_language_words (
+                id TEXT PRIMARY KEY,
+                language_id TEXT NOT NULL REFERENCES book_languages(id) ON DELETE CASCADE,
+                source_word TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(language_id, source_word)
+            )",
+            [],
+        ).ok();
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_book_languages_book ON book_languages(book_id)", []).ok();
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_book_language_mappings_lang ON book_language_mappings(language_id)", []).ok();
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_book_language_words_lang ON book_language_words(language_id)", []).ok();
         Ok(())
     }
 

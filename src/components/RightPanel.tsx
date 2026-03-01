@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useStore, DEMO_LIMITS } from '../store';
+import { LanguagesTab } from './LanguagesTab';
 
 interface Character {
   id: string;
@@ -37,6 +38,13 @@ interface LoreEntry {
   title: string;
   content?: string;
   category?: string;
+}
+
+interface BookLanguage {
+  id: string;
+  book_id: string;
+  name: string;
+  description?: string;
 }
 
 interface EntityAppearance {
@@ -76,11 +84,12 @@ export function RightPanel() {
   const [items, setItems] = useState<Item[]>([]);
   const [factions, setFactions] = useState<Faction[]>([]);
   const [loreEntries, setLoreEntries] = useState<LoreEntry[]>([]);
+  const [languages, setLanguages] = useState<BookLanguage[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [editing, setEditing] = useState<EditingEntity>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'characters' | 'locations' | 'items' | 'factions' | 'lore'>('characters');
+  const [activeTab, setActiveTab] = useState<'characters' | 'locations' | 'items' | 'factions' | 'lore' | 'languages'>('characters');
   const [appearances, setAppearances] = useState<EntityAppearance[]>([]);
   const [showAppearancesFor, setShowAppearancesFor] = useState<{ type: string; id: string; name: string } | null>(null);
 
@@ -91,6 +100,7 @@ export function RightPanel() {
     invoke<Item[]>('get_items', { bookId: currentBookId }).then(setItems).catch(console.error);
     invoke<Faction[]>('get_factions', { bookId: currentBookId }).then(setFactions).catch(console.error);
     invoke<LoreEntry[]>('get_lore_entries', { bookId: currentBookId }).then(setLoreEntries).catch(console.error);
+    invoke<BookLanguage[]>('get_book_languages', { bookId: currentBookId }).then(setLanguages).catch(console.error);
     invoke<Chapter[]>('get_chapters', { bookId: currentBookId }).then(setChapters).catch(console.error);
   }, [currentBookId]);
 
@@ -207,6 +217,7 @@ export function RightPanel() {
       else if (kind === 'item') await invoke('delete_item', { itemId: id });
       else if (kind === 'faction') await invoke('delete_faction', { factionId: id });
       else if (kind === 'lore') await invoke('delete_lore_entry', { loreId: id });
+      else if (kind === 'language') await invoke('delete_book_language', { languageId: id });
       setDeleteConfirm(null);
       loadData();
     } catch (e) {
@@ -220,6 +231,7 @@ export function RightPanel() {
     { id: 'items' as const, label: 'Предметы' },
     { id: 'factions' as const, label: 'Фракции' },
     { id: 'lore' as const, label: 'Лор' },
+    { id: 'languages' as const, label: 'Языки' },
   ];
 
   const commonInputStyle = {
@@ -367,6 +379,17 @@ export function RightPanel() {
             commonBtnStyle={commonBtnStyle}
             isDemo={isDemo}
             limit={DEMO_LIMITS.entities}
+          />
+        )}
+        {activeTab === 'languages' && (
+          <LanguagesTab
+            languages={languages}
+            loadData={loadData}
+            currentBookId={currentBookId}
+            onDelete={(id) => setDeleteConfirm(`language:${id}`)}
+            onInsertConverted={(text) => window.dispatchEvent(new CustomEvent('storyweaver-insert-text', { detail: { text } }))}
+            commonInputStyle={commonInputStyle}
+            commonBtnStyle={commonBtnStyle}
           />
         )}
       </div>

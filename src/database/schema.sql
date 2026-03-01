@@ -189,8 +189,41 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Book languages (рунические, вымышленные и т.д.)
+CREATE TABLE IF NOT EXISTS book_languages (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Character mappings: любой символ (латиница, кириллица и т.д.) → символ языка
+CREATE TABLE IF NOT EXISTS book_language_mappings (
+    id TEXT PRIMARY KEY,
+    language_id TEXT NOT NULL REFERENCES book_languages(id) ON DELETE CASCADE,
+    source_char TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(language_id, source_char)
+);
+
+-- Word mappings (опционально): слово → символ или последовательность
+CREATE TABLE IF NOT EXISTS book_language_words (
+    id TEXT PRIMARY KEY,
+    language_id TEXT NOT NULL REFERENCES book_languages(id) ON DELETE CASCADE,
+    source_word TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(language_id, source_word)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_chapters_book ON chapters(book_id);
+CREATE INDEX IF NOT EXISTS idx_book_languages_book ON book_languages(book_id);
+CREATE INDEX IF NOT EXISTS idx_book_language_mappings_lang ON book_language_mappings(language_id);
+CREATE INDEX IF NOT EXISTS idx_book_language_words_lang ON book_language_words(language_id);
 CREATE INDEX IF NOT EXISTS idx_scenes_chapter ON scenes(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_characters_book ON characters(book_id);
 CREATE INDEX IF NOT EXISTS idx_locations_book ON locations(book_id);
