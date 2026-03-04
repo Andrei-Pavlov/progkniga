@@ -1318,6 +1318,206 @@ pub fn set_book_language_words(
     Ok(())
 }
 
+// --- Character stats ---
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BookStatDefinition {
+    pub id: String,
+    pub book_id: String,
+    pub name: String,
+    pub max_value: i32,
+    pub sort_order: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CharacterStatVersion {
+    pub id: String,
+    pub character_id: String,
+    pub label: String,
+    pub sort_order: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CharacterStatValue {
+    pub id: String,
+    pub version_id: String,
+    pub stat_definition_id: String,
+    pub value: f64,
+}
+
+pub fn get_book_stat_definitions(state: &DbState, book_id: &str) -> Result<Vec<BookStatDefinition>, String> {
+    let conn = state.db.conn();
+    let mut stmt = conn
+        .prepare("SELECT id, book_id, name, max_value, sort_order FROM book_stat_definitions WHERE book_id = ?1 ORDER BY sort_order, name")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([book_id], |row| {
+            Ok(BookStatDefinition {
+                id: row.get(0)?,
+                book_id: row.get(1)?,
+                name: row.get(2)?,
+                max_value: row.get(3)?,
+                sort_order: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+pub fn create_book_stat_definition(
+    state: &DbState,
+    book_id: &str,
+    name: &str,
+    max_value: i32,
+) -> Result<String, String> {
+    let id = Uuid::new_v4().to_string();
+    let conn = state.db.conn();
+    let max_order: i32 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM book_stat_definitions WHERE book_id = ?1",
+            [book_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(1);
+    conn.execute(
+        "INSERT INTO book_stat_definitions (id, book_id, name, max_value, sort_order) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![id, book_id, name, max_value, max_order],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(id)
+}
+
+pub fn update_book_stat_definition(
+    state: &DbState,
+    stat_id: &str,
+    name: Option<&str>,
+    max_value: Option<i32>,
+) -> Result<(), String> {
+    let conn = state.db.conn();
+    if let Some(n) = name {
+        conn.execute(
+            "UPDATE book_stat_definitions SET name = ?1 WHERE id = ?2",
+            rusqlite::params![n, stat_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if let Some(m) = max_value {
+        conn.execute(
+            "UPDATE book_stat_definitions SET max_value = ?1 WHERE id = ?2",
+            rusqlite::params![m, stat_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn delete_book_stat_definition(state: &DbState, stat_id: &str) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute("DELETE FROM book_stat_definitions WHERE id = ?1", [stat_id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn get_character_stat_versions(state: &DbState, character_id: &str) -> Result<Vec<CharacterStatVersion>, String> {
+    let conn = state.db.conn();
+    let mut stmt = conn
+        .prepare("SELECT id, character_id, label, sort_order FROM character_stat_versions WHERE character_id = ?1 ORDER BY sort_order")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([character_id], |row| {
+            Ok(CharacterStatVersion {
+                id: row.get(0)?,
+                character_id: row.get(1)?,
+                label: row.get(2)?,
+                sort_order: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+pub fn create_character_stat_version(
+    state: &DbState,
+    character_id: &str,
+    label: &str,
+) -> Result<String, String> {
+    let id = Uuid::new_v4().to_string();
+    let conn = state.db.conn();
+    let max_order: i32 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM character_stat_versions WHERE character_id = ?1",
+            [character_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(1);
+    conn.execute(
+        "INSERT INTO character_stat_versions (id, character_id, label, sort_order) VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![id, character_id, label, max_order],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(id)
+}
+
+pub fn update_character_stat_version_label(state: &DbState, version_id: &str, label: &str) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute(
+        "UPDATE character_stat_versions SET label = ?1 WHERE id = ?2",
+        rusqlite::params![label, version_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn delete_character_stat_version(state: &DbState, version_id: &str) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute("DELETE FROM character_stat_versions WHERE id = ?1", [version_id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn get_character_stat_values(state: &DbState, version_id: &str) -> Result<Vec<CharacterStatValue>, String> {
+    let conn = state.db.conn();
+    let mut stmt = conn
+        .prepare("SELECT id, version_id, stat_definition_id, value FROM character_stat_values WHERE version_id = ?1")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([version_id], |row| {
+            Ok(CharacterStatValue {
+                id: row.get(0)?,
+                version_id: row.get(1)?,
+                stat_definition_id: row.get(2)?,
+                value: row.get(3)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+pub fn set_character_stat_values(
+    state: &DbState,
+    version_id: &str,
+    values: &[(String, f64)],
+) -> Result<(), String> {
+    let conn = state.db.conn();
+    conn.execute("DELETE FROM character_stat_values WHERE version_id = ?1", [version_id])
+        .map_err(|e| e.to_string())?;
+    for (stat_id, value) in values {
+        let id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO character_stat_values (id, version_id, stat_definition_id, value) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![id, version_id, stat_id, value],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EntityAppearance {
     pub chapter_id: String,

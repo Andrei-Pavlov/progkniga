@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useStore, DEMO_LIMITS } from '../store';
 import { LanguagesTab } from './LanguagesTab';
+import { StatsTab } from './StatsTab';
+import { CharacterStatsModal } from './CharacterStatsModal';
 
 interface Character {
   id: string;
@@ -89,9 +91,10 @@ export function RightPanel() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editing, setEditing] = useState<EditingEntity>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'characters' | 'locations' | 'items' | 'factions' | 'lore' | 'languages'>('characters');
+  const [activeTab, setActiveTab] = useState<'characters' | 'locations' | 'items' | 'factions' | 'lore' | 'languages' | 'stats'>('characters');
   const [appearances, setAppearances] = useState<EntityAppearance[]>([]);
   const [showAppearancesFor, setShowAppearancesFor] = useState<{ type: string; id: string; name: string } | null>(null);
+  const [statsModalCharacter, setStatsModalCharacter] = useState<{ id: string; name: string } | null>(null);
 
   const loadData = useCallback(() => {
     if (!currentBookId) return;
@@ -232,6 +235,7 @@ export function RightPanel() {
     { id: 'factions' as const, label: 'Фракции' },
     { id: 'lore' as const, label: 'Лор' },
     { id: 'languages' as const, label: 'Языки' },
+    { id: 'stats' as const, label: 'Статистика' },
   ];
 
   const commonInputStyle = {
@@ -315,6 +319,7 @@ export function RightPanel() {
             onDelete={(id) => setDeleteConfirm(`character:${id}`)}
             onInsert={(name) => window.dispatchEvent(new CustomEvent('storyweaver-insert-text', { detail: { text: name } }))}
             onShowAppearances={loadAppearances}
+            onShowStats={(id, name) => setStatsModalCharacter({ id, name })}
             commonInputStyle={commonInputStyle}
             commonBtnStyle={commonBtnStyle}
             isDemo={isDemo}
@@ -392,7 +397,24 @@ export function RightPanel() {
             commonBtnStyle={commonBtnStyle}
           />
         )}
+        {activeTab === 'stats' && (
+          <StatsTab
+            currentBookId={currentBookId}
+            loadData={loadData}
+            commonInputStyle={commonInputStyle}
+            commonBtnStyle={commonBtnStyle}
+          />
+        )}
       </div>
+
+      {statsModalCharacter && currentBookId && (
+        <CharacterStatsModal
+          characterId={statsModalCharacter.id}
+          characterName={statsModalCharacter.name}
+          bookId={currentBookId}
+          onClose={() => setStatsModalCharacter(null)}
+        />
+      )}
 
       {showAppearancesFor && (
         <div
@@ -502,6 +524,7 @@ function CharactersTab({
   onDelete,
   onInsert,
   onShowAppearances,
+  onShowStats,
   commonInputStyle,
   commonBtnStyle,
   isDemo,
@@ -518,6 +541,7 @@ function CharactersTab({
   onDelete: (id: string) => void;
   onInsert: (name: string) => void;
   onShowAppearances: (type: string, id: string, name: string) => void;
+  onShowStats: (id: string, name: string) => void;
   commonInputStyle: React.CSSProperties;
   commonBtnStyle: React.CSSProperties;
   isDemo?: boolean;
@@ -685,6 +709,9 @@ function CharactersTab({
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button onClick={() => setEditing({ type: 'character', data: { ...c } })} style={commonBtnStyle}>
                   Редактировать
+                </button>
+                <button onClick={() => onShowStats(c.id, c.name)} style={commonBtnStyle}>
+                  Статистика
                 </button>
                 <button onClick={() => onInsert(c.name)} style={commonBtnStyle}>
                   Вставить

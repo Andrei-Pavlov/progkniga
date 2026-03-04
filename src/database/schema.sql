@@ -219,8 +219,41 @@ CREATE TABLE IF NOT EXISTS book_language_words (
     UNIQUE(language_id, source_word)
 );
 
+-- Статистика книги (сила, ловкость и т.д.) — автор задаёт любые статы
+CREATE TABLE IF NOT EXISTS book_stat_definitions (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    max_value INTEGER NOT NULL DEFAULT 10,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(book_id, name)
+);
+
+-- Версии/снимки статов персонажа для отслеживания прогресса
+CREATE TABLE IF NOT EXISTS character_stat_versions (
+    id TEXT PRIMARY KEY,
+    character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Значения статов в версии (значение может превышать max!)
+CREATE TABLE IF NOT EXISTS character_stat_values (
+    id TEXT PRIMARY KEY,
+    version_id TEXT NOT NULL REFERENCES character_stat_versions(id) ON DELETE CASCADE,
+    stat_definition_id TEXT NOT NULL REFERENCES book_stat_definitions(id) ON DELETE CASCADE,
+    value REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(version_id, stat_definition_id)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_chapters_book ON chapters(book_id);
+CREATE INDEX IF NOT EXISTS idx_book_stat_definitions_book ON book_stat_definitions(book_id);
+CREATE INDEX IF NOT EXISTS idx_character_stat_versions_character ON character_stat_versions(character_id);
+CREATE INDEX IF NOT EXISTS idx_character_stat_values_version ON character_stat_values(version_id);
 CREATE INDEX IF NOT EXISTS idx_book_languages_book ON book_languages(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_language_mappings_lang ON book_language_mappings(language_id);
 CREATE INDEX IF NOT EXISTS idx_book_language_words_lang ON book_language_words(language_id);

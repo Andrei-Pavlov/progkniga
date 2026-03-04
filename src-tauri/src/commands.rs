@@ -792,3 +792,106 @@ pub fn set_book_language_words(
     let db = db_guard.as_ref().ok_or("No project open")?;
     crate::db_commands::set_book_language_words(db, &language_id, &words)
 }
+
+// --- Character stats ---
+
+#[tauri::command]
+pub fn get_book_stat_definitions(
+    state: State<AppState>,
+    book_id: String,
+) -> Result<Vec<crate::db_commands::BookStatDefinition>, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::get_book_stat_definitions(db, &book_id)
+}
+
+#[tauri::command]
+pub fn create_book_stat_definition(
+    state: State<AppState>,
+    book_id: String,
+    name: String,
+    max_value: i32,
+) -> Result<String, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::create_book_stat_definition(db, &book_id, &name, max_value)
+}
+
+#[tauri::command]
+pub fn update_book_stat_definition(
+    state: State<AppState>,
+    stat_id: String,
+    name: Option<String>,
+    max_value: Option<i32>,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::update_book_stat_definition(db, &stat_id, name.as_deref(), max_value)
+}
+
+#[tauri::command]
+pub fn delete_book_stat_definition(state: State<AppState>, stat_id: String) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::delete_book_stat_definition(db, &stat_id)
+}
+
+#[tauri::command]
+pub fn get_character_stat_versions(
+    state: State<AppState>,
+    character_id: String,
+) -> Result<Vec<crate::db_commands::CharacterStatVersion>, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::get_character_stat_versions(db, &character_id)
+}
+
+#[tauri::command]
+pub fn create_character_stat_version(
+    state: State<AppState>,
+    character_id: String,
+    label: String,
+) -> Result<String, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::create_character_stat_version(db, &character_id, &label)
+}
+
+#[tauri::command]
+pub fn update_character_stat_version_label(
+    state: State<AppState>,
+    version_id: String,
+    label: String,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::update_character_stat_version_label(db, &version_id, &label)
+}
+
+#[tauri::command]
+pub fn delete_character_stat_version(state: State<AppState>, version_id: String) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::delete_character_stat_version(db, &version_id)
+}
+
+#[tauri::command]
+pub fn get_character_stat_values(
+    state: State<AppState>,
+    version_id: String,
+) -> Result<Vec<crate::db_commands::CharacterStatValue>, String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::get_character_stat_values(db, &version_id)
+}
+
+#[tauri::command]
+pub fn set_character_stat_values(
+    state: State<AppState>,
+    version_id: String,
+    values: Vec<(String, f64)>,
+) -> Result<(), String> {
+    let db_guard = state.db.lock().expect("db lock");
+    let db = db_guard.as_ref().ok_or("No project open")?;
+    crate::db_commands::set_character_stat_values(db, &version_id, &values)
+}

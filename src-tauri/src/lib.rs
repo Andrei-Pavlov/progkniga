@@ -81,6 +81,16 @@ pub fn run() {
             commands::set_book_language_mappings,
             commands::get_book_language_words,
             commands::set_book_language_words,
+            commands::get_book_stat_definitions,
+            commands::create_book_stat_definition,
+            commands::update_book_stat_definition,
+            commands::delete_book_stat_definition,
+            commands::get_character_stat_versions,
+            commands::create_character_stat_version,
+            commands::update_character_stat_version_label,
+            commands::delete_character_stat_version,
+            commands::get_character_stat_values,
+            commands::set_character_stat_values,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
