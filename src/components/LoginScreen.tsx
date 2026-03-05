@@ -129,7 +129,7 @@ export function LoginScreen() {
             cursor: 'pointer',
           }}
         >
-          Демо (без авторизации)
+          Тест для писателей (без авторизации)
         </button>
       </div>
       {error && <p style={{ color: 'var(--error)', margin: 0, fontSize: 13 }}>{error}</p>}

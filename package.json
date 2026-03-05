@@ -1,6 +1,6 @@
 {
   "name": "storyweaver-desktop",
-  "version": "1.0.23",
+  "version": "1.0.23.1",
   "description": "Professional offline-first writing application",
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:signed": "powershell -ExecutionPolicy Bypass -File scripts/tauri-build.ps1",
+    "install:build-tools": "powershell -ExecutionPolicy Bypass -File scripts/install-build-tools.ps1",
     "auth-service": "node auth-service/index.cjs"
   },
   "dependencies": {

@@ -322,8 +322,8 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
             ›
           </button>
         </div>
-        <span style={{ fontSize: 12, color: isDemo && charCount >= DEMO_LIMITS.charsPerChapter ? 'var(--error)' : 'var(--text-secondary)' }}>
-          {wordCount} слов · {charCount}{isDemo ? `/${DEMO_LIMITS.charsPerChapter}` : ''} симв.
+        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+          {wordCount} слов · {charCount} симв.
         </span>
         <button
           onClick={saveChapter}
@@ -429,7 +429,7 @@ export function ChapterEditor({ focusMode }: ChapterEditorProps) {
                 setContent(v);
               }
             }}
-            placeholder={isDemo ? `Начните писать... (макс. ${DEMO_LIMITS.charsPerChapter} символов)` : 'Начните писать...'}
+            placeholder="Начните писать..."
             style={{
               flex: 1,
               padding: 24,

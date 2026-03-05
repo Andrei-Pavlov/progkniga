@@ -281,7 +281,7 @@ export function LeftPanel() {
       {currentBook && (
         <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
           <h4 style={{ margin: '0 0 8px 0', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Главы</h4>
-          {isDemo && <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {chapters.length}/{DEMO_LIMITS.chapters} глав</p>}
+          {isDemo && <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Тест для писателей: {chapters.length} глав</p>}
           <input
             type="text"
             placeholder="Поиск глав..."

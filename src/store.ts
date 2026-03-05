@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 
 const DEMO_LIMITS = {
-  entities: 5,
-  chapters: 5,
-  charsPerChapter: 5000,
+  entities: 999999,
+  chapters: 999999,
+  charsPerChapter: 999999999,
 } as const;
 
 const STORAGE_KEYS = {

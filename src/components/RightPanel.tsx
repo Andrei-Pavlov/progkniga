@@ -559,7 +559,7 @@ function CharactersTab({
   return (
     <>
       <div style={{ marginBottom: 12 }}>
-        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {characters.length}/{limit} персонажей</p>}
+        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Тест для писателей: {characters.length} персонажей</p>}
         <input
           placeholder="Имя персонажа"
           value={newName}
@@ -837,7 +837,7 @@ function AddLocationForm({
   };
   return (
     <div style={{ marginBottom: 12 }}>
-      {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {locations.length}/{limit} локаций</p>}
+      {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Тест для писателей: {locations.length} локаций</p>}
       <input placeholder="Название" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} style={commonInputStyle} />
       <textarea placeholder="Описание" value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} style={{ ...commonInputStyle, width: '100%', marginTop: 6, resize: 'vertical' }} />
       <select value={parentId || ''} onChange={(e) => setParentId(e.target.value || null)} style={{ ...commonInputStyle, width: '100%', marginTop: 6 }}>
@@ -896,7 +896,7 @@ function ItemsTab({
   return (
     <>
       <div style={{ marginBottom: 12 }}>
-        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {items.length}/{limit} предметов</p>}
+        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Тест для писателей: {items.length} предметов</p>}
         <input placeholder="Название предмета" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} style={commonInputStyle} />
         <textarea placeholder="Описание" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} rows={2} style={{ ...commonInputStyle, width: '100%', marginTop: 6, resize: 'vertical' }} />
         <button onClick={handleAdd} disabled={atLimit} style={{ marginTop: 6, padding: '8px 14px', background: atLimit ? 'var(--bg-tertiary)' : 'var(--accent)', color: atLimit ? 'var(--text-secondary)' : 'white', border: 'none', borderRadius: 6, cursor: atLimit ? 'not-allowed' : 'pointer' }}>
@@ -978,7 +978,7 @@ function FactionsTab({
   return (
     <>
       <div style={{ marginBottom: 12 }}>
-        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {factions.length}/{limit} фракций</p>}
+        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Тест для писателей: {factions.length} фракций</p>}
         <input placeholder="Название фракции" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdd()} style={commonInputStyle} />
         <textarea placeholder="Описание" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} rows={2} style={{ ...commonInputStyle, width: '100%', marginTop: 6, resize: 'vertical' }} />
         <button onClick={handleAdd} disabled={atLimit} style={{ marginTop: 6, padding: '8px 14px', background: atLimit ? 'var(--bg-tertiary)' : 'var(--accent)', color: atLimit ? 'var(--text-secondary)' : 'white', border: 'none', borderRadius: 6, cursor: atLimit ? 'not-allowed' : 'pointer' }}>
@@ -1084,7 +1084,7 @@ function LoreTab({
   return (
     <>
       <div style={{ marginBottom: 12 }}>
-        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Демо: {entries.length}/{limit} записей лора</p>}
+        {isDemo && <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>Тест для писателей: {entries.length} записей лора</p>}
         <input placeholder="Заголовок" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} style={commonInputStyle} />
         <textarea placeholder="Содержание" value={newContent} onChange={(e) => setNewContent(e.target.value)} rows={3} style={{ ...commonInputStyle, width: '100%', marginTop: 6, resize: 'vertical' }} />
         <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={{ ...commonInputStyle, width: '100%', marginTop: 6 }}>
