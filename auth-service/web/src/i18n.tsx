@@ -187,6 +187,35 @@ const ru: Dict = {
   'admin.col.source': 'Источник',
   'admin.col.until': 'До',
   'admin.col.updated': 'Обновлён',
+
+  'admin.grantTitle': 'Выдать подписку',
+  'admin.grantLead': 'Активирует доступ для email-аккаунта сайта (продлевает, если уже есть срок).',
+  'admin.grantCustom': 'Свой срок (дни)',
+  'admin.grantDays': 'Дней',
+  'admin.grantSubmit': 'Выдать',
+  'admin.grantOk': 'Подписка выдана',
+  'admin.grantFail': 'Не удалось выдать подписку',
+  'admin.working': 'Сохранение…',
+
+  'admin.refTitle': 'Реферальные коды',
+  'admin.refLead': 'Скидка на оплату на сайте. Учитываются использования и сумма оплаченных заказов.',
+  'admin.refCode': 'Код',
+  'admin.refDiscount': 'Скидка %',
+  'admin.refMaxUses': 'Лимит использований (пусто = без лимита)',
+  'admin.refNote': 'Заметка (необязательно)',
+  'admin.refCreate': 'Создать код',
+  'admin.refOk': 'Код создан',
+  'admin.refFail': 'Не удалось сохранить код',
+  'admin.refTotal': 'Кодов',
+  'admin.refActive': 'Активных',
+  'admin.refUses': 'Использований',
+  'admin.refPaidUses': 'Оплат',
+  'admin.refRevenue': 'Оплачено USD',
+  'admin.refDisable': 'Выкл',
+  'admin.refEnable': 'Вкл',
+
+  'subscribe.referral': 'Реферальный / промокод',
+  'subscribe.referralPh': 'Например PARTNER10',
 };
 
 const en: Dict = {
@@ -361,6 +390,35 @@ const en: Dict = {
   'admin.col.source': 'Source',
   'admin.col.until': 'Until',
   'admin.col.updated': 'Updated',
+
+  'admin.grantTitle': 'Grant subscription',
+  'admin.grantLead': 'Activates access for a website email account (extends if already active).',
+  'admin.grantCustom': 'Custom length (days)',
+  'admin.grantDays': 'Days',
+  'admin.grantSubmit': 'Grant',
+  'admin.grantOk': 'Subscription granted',
+  'admin.grantFail': 'Could not grant subscription',
+  'admin.working': 'Saving…',
+
+  'admin.refTitle': 'Referral codes',
+  'admin.refLead': 'Checkout discount codes. Tracks uses and paid revenue.',
+  'admin.refCode': 'Code',
+  'admin.refDiscount': 'Discount %',
+  'admin.refMaxUses': 'Max uses (empty = unlimited)',
+  'admin.refNote': 'Note (optional)',
+  'admin.refCreate': 'Create code',
+  'admin.refOk': 'Code created',
+  'admin.refFail': 'Could not save code',
+  'admin.refTotal': 'Codes',
+  'admin.refActive': 'Active',
+  'admin.refUses': 'Uses',
+  'admin.refPaidUses': 'Paid checkouts',
+  'admin.refRevenue': 'Paid USD',
+  'admin.refDisable': 'Off',
+  'admin.refEnable': 'On',
+
+  'subscribe.referral': 'Referral / promo code',
+  'subscribe.referralPh': 'e.g. PARTNER10',
 };
 
 const DICTS: Record<Locale, Dict> = { ru, en };

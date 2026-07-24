@@ -109,19 +109,28 @@ export async function fetchPlans(): Promise<{ success: boolean; plans: Plan[]; t
   return json(res);
 }
 
-export async function checkout(token: string, planId: string) {
+export async function checkout(token: string, planId: string, referralCode?: string) {
   const res = await fetch('/billing/checkout', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ planId }),
+    body: JSON.stringify({ planId, referralCode: referralCode || undefined }),
   });
   return json<{
     success: boolean;
-    order?: { id: string; amountUsd: number; planId: string; status: string };
+    order?: {
+      id: string;
+      amountUsd: number;
+      originalUsd?: number;
+      discountPercent?: number;
+      referralCode?: string | null;
+      planId: string;
+      status: string;
+    };
     plan?: Plan;
+    referral?: { code: string; discountPercent: number } | null;
     payUrl?: string | null;
     message?: string;
     error?: string;

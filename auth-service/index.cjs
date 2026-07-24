@@ -726,7 +726,9 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const fullUser = webAuth.getUserById(me.user.id);
-      const created = webAuth.createOrder(fullUser, body.planId);
+      const created = webAuth.createOrder(fullUser, body.planId, {
+        referralCode: body.referralCode || body.ref || null,
+      });
       if (!created.ok) {
         sendJson(400, { success: false, error: created.error });
         return;
@@ -744,6 +746,7 @@ const server = http.createServer(async (req, res) => {
         success: true,
         order: created.order,
         plan: created.plan,
+        referral: created.referral,
         payUrl,
         message: payUrl
           ? 'Перейдите по ссылке для оплаты'
@@ -775,7 +778,9 @@ const server = http.createServer(async (req, res) => {
       sendJson(400, { success: false, error: 'Укажите email или orderId' });
       return;
     }
-    const activated = webAuth.activateSubscription(email, planId);
+    const activated = webAuth.activateSubscription(email, planId, {
+      days: url.searchParams.get('days') ? Number(url.searchParams.get('days')) : undefined,
+    });
     sendJson(activated.ok ? 200 : 400, activated.ok ? { success: true, user: activated.user } : { success: false, error: activated.error });
     return;
   }
@@ -821,6 +826,117 @@ const server = http.createServer(async (req, res) => {
     }
     const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') || 100)));
     sendJson(200, { success: true, orders: webAuth.listOrdersSafe().slice(0, limit) });
+    return;
+  }
+
+  if (url.pathname === '/admin/grant' && req.method === 'POST') {
+    const authz = isAdminAuthorized(req, url);
+    if (!authz.ok) {
+      sendJson(401, { success: false, error: 'Unauthorized' });
+      return;
+    }
+    try {
+      const body = await readJsonBody(req);
+      const email = body.email;
+      const planId = body.planId || body.plan || 'monthly';
+      const days = body.days != null ? Number(body.days) : undefined;
+      const extend = body.extend !== false;
+      const activated = webAuth.activateSubscription(email, planId, { extend, days });
+      if (!activated.ok) {
+        sendJson(400, { success: false, error: activated.error });
+        return;
+      }
+      sendJson(200, { success: true, user: activated.user });
+    } catch (e) {
+      sendJson(400, { success: false, error: 'Некорректный запрос' });
+    }
+    return;
+  }
+
+  if (url.pathname === '/admin/referrals' && req.method === 'GET') {
+    const authz = isAdminAuthorized(req, url);
+    if (!authz.ok) {
+      sendJson(401, { success: false, error: 'Unauthorized' });
+      return;
+    }
+    sendJson(200, { success: true, referrals: webAuth.listReferrals() });
+    return;
+  }
+
+  if (url.pathname === '/admin/referrals' && req.method === 'POST') {
+    const authz = isAdminAuthorized(req, url);
+    if (!authz.ok) {
+      sendJson(401, { success: false, error: 'Unauthorized' });
+      return;
+    }
+    try {
+      const body = await readJsonBody(req);
+      const created = webAuth.createReferral({
+        code: body.code,
+        discountPercent: body.discountPercent,
+        maxUses: body.maxUses,
+        note: body.note,
+      });
+      if (!created.ok) {
+        sendJson(400, { success: false, error: created.error });
+        return;
+      }
+      sendJson(200, { success: true, referral: created.referral });
+    } catch (e) {
+      sendJson(400, { success: false, error: 'Некорректный запрос' });
+    }
+    return;
+  }
+
+  if (url.pathname === '/admin/referrals/toggle' && req.method === 'POST') {
+    const authz = isAdminAuthorized(req, url);
+    if (!authz.ok) {
+      sendJson(401, { success: false, error: 'Unauthorized' });
+      return;
+    }
+    try {
+      const body = await readJsonBody(req);
+      const updated = webAuth.setReferralActive(body.code, body.active !== false);
+      if (!updated.ok) {
+        sendJson(400, { success: false, error: updated.error });
+        return;
+      }
+      sendJson(200, { success: true, referral: updated.referral });
+    } catch (e) {
+      sendJson(400, { success: false, error: 'Некорректный запрос' });
+    }
+    return;
+  }
+
+  if (url.pathname === '/billing/referral/validate' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const plan = webAuth.PLANS[body.planId];
+      if (!plan) {
+        sendJson(400, { success: false, error: 'Неизвестный тариф' });
+        return;
+      }
+      const ref = webAuth.getReferral(body.code);
+      if (!ref || ref.active === false) {
+        sendJson(400, { success: false, error: 'Код недействителен' });
+        return;
+      }
+      if (ref.maxUses != null && Number(ref.uses) >= Number(ref.maxUses)) {
+        sendJson(400, { success: false, error: 'Лимит использований исчерпан' });
+        return;
+      }
+      const pct = Math.max(0, Math.min(100, Number(ref.discountPercent) || 0));
+      const amountUsd = Math.round(plan.priceUsd * (1 - pct / 100) * 100) / 100;
+      sendJson(200, {
+        success: true,
+        code: ref.code,
+        discountPercent: pct,
+        originalUsd: plan.priceUsd,
+        amountUsd,
+      });
+    } catch (e) {
+      sendJson(400, { success: false, error: 'Некорректный запрос' });
+    }
     return;
   }
 

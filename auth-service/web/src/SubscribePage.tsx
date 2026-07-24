@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   checkout,
   fetchMe,
@@ -13,6 +13,7 @@ import { formatUsd, useI18n } from './i18n';
 export function SubscribePage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [trialDays, setTrialDays] = useState(7);
   const [loading, setLoading] = useState(true);
@@ -20,6 +21,7 @@ export function SubscribePage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isTelegram, setIsTelegram] = useState(false);
+  const [referralCode, setReferralCode] = useState(() => (searchParams.get('ref') || '').toUpperCase());
 
   useEffect(() => {
     const token = localStorage.getItem(STORAGE_TOKEN);
@@ -51,7 +53,7 @@ export function SubscribePage() {
     setError('');
     setMessage('');
     try {
-      const res = await checkout(token, planId);
+      const res = await checkout(token, planId, referralCode.trim() || undefined);
       if (!res.success) {
         setError(res.error || t('subscribe.orderFail'));
         return;
@@ -60,8 +62,12 @@ export function SubscribePage() {
         window.location.href = res.payUrl;
         return;
       }
+      const discount =
+        res.order?.discountPercent && res.order.discountPercent > 0
+          ? ` (−${res.order.discountPercent}%${res.order.referralCode ? ` · ${res.order.referralCode}` : ''})`
+          : '';
       setMessage(
-        `${res.message || ''} Order: ${res.order?.id || '—'} · ${formatUsd(res.order?.amountUsd || 0, locale)}`
+        `${res.message || ''} Order: ${res.order?.id || '—'} · ${formatUsd(res.order?.amountUsd || 0, locale)}${discount}`
       );
     } catch {
       setError(t('subscribe.network'));
@@ -117,6 +123,20 @@ export function SubscribePage() {
       <div className="section-head">
         <h2>{t('subscribe.title')}</h2>
         <p>{t('subscribe.lead', { days: trialDays })}</p>
+      </div>
+
+      <div className="panel stack" style={{ marginBottom: 20, maxWidth: 420 }}>
+        <label className="stat-label" htmlFor="ref-code">
+          {t('subscribe.referral')}
+        </label>
+        <input
+          id="ref-code"
+          className="field"
+          value={referralCode}
+          onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+          placeholder={t('subscribe.referralPh')}
+          autoComplete="off"
+        />
       </div>
 
       <div className="download-grid">

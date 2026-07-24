@@ -9,12 +9,15 @@ const { randomUUID } = require('crypto');
 function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
   const USERS_FILE = path.join(dataDir, 'web-users.json');
   const ORDERS_FILE = path.join(dataDir, 'web-orders.json');
+  const REFERRALS_FILE = path.join(dataDir, 'web-referrals.json');
   const secret = jwtSecret || crypto.randomBytes(32).toString('hex');
 
   /** @type {Map<string, any>} email -> user */
   let users = new Map();
   /** @type {Map<string, any>} orderId -> order */
   let orders = new Map();
+  /** @type {Map<string, any>} code -> referral */
+  let referrals = new Map();
 
   const PLANS = {
     monthly: {
@@ -46,6 +49,12 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     } catch (_) {
       orders = new Map();
     }
+    try {
+      const raw = JSON.parse(fs.readFileSync(REFERRALS_FILE, 'utf8'));
+      referrals = new Map(Object.entries(raw));
+    } catch (_) {
+      referrals = new Map();
+    }
   }
 
   function saveUsers() {
@@ -58,6 +67,12 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     const dir = path.dirname(ORDERS_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(ORDERS_FILE, JSON.stringify(Object.fromEntries(orders), null, 2));
+  }
+
+  function saveReferrals() {
+    const dir = path.dirname(REFERRALS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(REFERRALS_FILE, JSON.stringify(Object.fromEntries(referrals), null, 2));
   }
 
   load();
@@ -310,44 +325,167 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     return Object.values(PLANS);
   }
 
-  function createOrder(user, planId) {
+  function normalizeReferralCode(code) {
+    return String(code || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]/g, '')
+      .slice(0, 32);
+  }
+
+  function publicReferral(ref) {
+    if (!ref) return null;
+    return {
+      code: ref.code,
+      discountPercent: Number(ref.discountPercent) || 0,
+      active: ref.active !== false,
+      maxUses: ref.maxUses ?? null,
+      uses: Number(ref.uses) || 0,
+      paidUses: Number(ref.paidUses) || 0,
+      revenueUsd: Math.round((Number(ref.revenueUsd) || 0) * 100) / 100,
+      note: ref.note || null,
+      createdAt: ref.createdAt,
+    };
+  }
+
+  function getReferral(code) {
+    const c = normalizeReferralCode(code);
+    if (!c) return null;
+    return referrals.get(c) || null;
+  }
+
+  function listReferrals() {
+    return [...referrals.values()]
+      .map(publicReferral)
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  }
+
+  function createReferral({ code, discountPercent = 0, maxUses = null, note = '' }) {
+    const c = normalizeReferralCode(code);
+    if (!c || c.length < 3) return { ok: false, error: 'Код слишком короткий (мин. 3 символа)' };
+    if (referrals.has(c)) return { ok: false, error: 'Такой код уже есть' };
+    const pct = Math.max(0, Math.min(100, Number(discountPercent) || 0));
+    const max = maxUses == null || maxUses === '' ? null : Math.max(1, Number(maxUses));
+    if (maxUses != null && maxUses !== '' && (!Number.isFinite(max) || max < 1)) {
+      return { ok: false, error: 'Некорректный maxUses' };
+    }
+    const ref = {
+      code: c,
+      discountPercent: pct,
+      active: true,
+      maxUses: max,
+      uses: 0,
+      paidUses: 0,
+      revenueUsd: 0,
+      note: String(note || '').trim() || null,
+      createdAt: new Date().toISOString(),
+    };
+    referrals.set(c, ref);
+    saveReferrals();
+    return { ok: true, referral: publicReferral(ref) };
+  }
+
+  function setReferralActive(code, active) {
+    const ref = getReferral(code);
+    if (!ref) return { ok: false, error: 'Код не найден' };
+    ref.active = !!active;
+    referrals.set(ref.code, ref);
+    saveReferrals();
+    return { ok: true, referral: publicReferral(ref) };
+  }
+
+  function applyReferralToPrice(priceUsd, referralCode) {
+    const ref = getReferral(referralCode);
+    if (!ref) return { ok: false, error: 'Реферальный код не найден' };
+    if (ref.active === false) return { ok: false, error: 'Код отключён' };
+    if (ref.maxUses != null && Number(ref.uses) >= Number(ref.maxUses)) {
+      return { ok: false, error: 'Лимит использований кода исчерпан' };
+    }
+    const pct = Math.max(0, Math.min(100, Number(ref.discountPercent) || 0));
+    const amount = Math.round(Number(priceUsd) * (1 - pct / 100) * 100) / 100;
+    return {
+      ok: true,
+      referral: ref,
+      amountUsd: Math.max(0, amount),
+      discountPercent: pct,
+      originalUsd: Number(priceUsd),
+    };
+  }
+
+  function createOrder(user, planId, { referralCode } = {}) {
     const plan = PLANS[planId];
     if (!plan) return { ok: false, error: 'Неизвестный тариф' };
+    if (!user) return { ok: false, error: 'Пользователь не найден' };
+
+    let amountUsd = plan.priceUsd;
+    let appliedCode = null;
+    let discountPercent = 0;
+    let originalUsd = plan.priceUsd;
+
+    if (referralCode) {
+      const applied = applyReferralToPrice(plan.priceUsd, referralCode);
+      if (!applied.ok) return applied;
+      amountUsd = applied.amountUsd;
+      discountPercent = applied.discountPercent;
+      originalUsd = applied.originalUsd;
+      appliedCode = applied.referral.code;
+      applied.referral.uses = (Number(applied.referral.uses) || 0) + 1;
+      referrals.set(appliedCode, applied.referral);
+      saveReferrals();
+    }
+
     const order = {
       id: randomUUID(),
       userId: user.id,
       email: user.email,
       planId: plan.id,
-      amountUsd: plan.priceUsd,
+      amountUsd,
+      originalUsd,
+      discountPercent,
+      referralCode: appliedCode,
       days: plan.days,
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
     orders.set(order.id, order);
     saveOrders();
-    return { ok: true, order, plan };
+    return { ok: true, order, plan, referral: appliedCode ? publicReferral(getReferral(appliedCode)) : null };
   }
 
-  function activateSubscription(emailOrUserId, planId, { extend = true } = {}) {
+  function activateSubscription(emailOrUserId, planId, { extend = true, days } = {}) {
     let user = users.get(normalizeEmail(emailOrUserId));
     if (!user) user = getUserById(emailOrUserId);
     if (!user) return { ok: false, error: 'Пользователь не найден' };
-    const plan = PLANS[planId] || (planId === 'trial' ? { id: 'trial', days: trialDays } : null);
+
+    let plan = PLANS[planId] || null;
+    if (!plan && planId === 'trial') plan = { id: 'trial', days: trialDays, priceUsd: 0 };
+    if (!plan && planId === 'custom') {
+      const d = Number(days);
+      if (!Number.isFinite(d) || d < 1) return { ok: false, error: 'Укажите days для custom' };
+      plan = { id: 'custom', days: d, priceUsd: 0 };
+    }
     if (!plan) return { ok: false, error: 'Неизвестный тариф' };
 
+    const planDays = days != null && Number(days) > 0 ? Number(days) : plan.days;
     const now = Date.now();
     let base = now;
     if (extend && user.subscription?.expiresAt) {
       const prev = new Date(user.subscription.expiresAt).getTime();
       if (!Number.isNaN(prev) && prev > now) base = prev;
     }
-    const expiresAt = new Date(base + plan.days * 24 * 3600 * 1000).toISOString();
+    const expiresAt = new Date(base + planDays * 24 * 3600 * 1000).toISOString();
     user.subscription = {
       active: true,
       plan: plan.id,
-      status: 'active',
+      status: plan.id === 'trial' ? 'trial' : 'active',
       expiresAt,
+      grantedByAdmin: plan.id === 'custom' || planId === 'custom' ? true : undefined,
     };
+    if (user.emailVerified === false) {
+      user.emailVerified = true;
+      user.emailVerifyToken = null;
+      user.emailVerifyExpires = null;
+    }
     users.set(user.email, user);
     saveUsers();
     return { ok: true, user: publicUser(user) };
@@ -363,6 +501,17 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     order.paidAt = new Date().toISOString();
     orders.set(order.id, order);
     saveOrders();
+
+    if (order.referralCode) {
+      const ref = getReferral(order.referralCode);
+      if (ref) {
+        ref.paidUses = (Number(ref.paidUses) || 0) + 1;
+        ref.revenueUsd = Math.round(((Number(ref.revenueUsd) || 0) + (Number(order.amountUsd) || 0)) * 100) / 100;
+        referrals.set(ref.code, ref);
+        saveReferrals();
+      }
+    }
+
     return { ok: true, order, user: activated.user };
   }
 
@@ -426,6 +575,11 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
         revenuePaidUsd: Math.round(revenuePaidUsd * 100) / 100,
         recent: orderList.slice(0, 25),
       },
+      referrals: {
+        total: referrals.size,
+        active: [...referrals.values()].filter((r) => r.active !== false).length,
+        items: listReferrals(),
+      },
     };
   }
 
@@ -445,6 +599,11 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     listUsersSafe,
     listOrdersSafe,
     getWebStats,
+    createReferral,
+    listReferrals,
+    getReferral,
+    setReferralActive,
+    publicReferral,
     publicUser,
     publicTelegramUser,
     verifyToken,
