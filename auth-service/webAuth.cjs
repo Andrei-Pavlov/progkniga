@@ -85,6 +85,8 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
       id: user.id,
       email: user.email,
       name: user.name || null,
+      provider: 'email',
+      telegramId: null,
       createdAt: user.createdAt,
       subscription: publicSubscription(user.subscription),
     };
@@ -118,7 +120,20 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     return `${body}.${sig}`;
   }
 
-  function verifyToken(token) {
+  function signTelegramToken(telegramId) {
+    const tg = String(telegramId);
+    const payload = {
+      sub: `tg:${tg}`,
+      telegramId: tg,
+      typ: 'telegram',
+      exp: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
+    };
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const sig = crypto.createHmac('sha256', secret).update(body).digest('base64url');
+    return `${body}.${sig}`;
+  }
+
+  function verifyToken(token, { allowTelegram = false } = {}) {
     if (!token || typeof token !== 'string' || !token.includes('.')) return null;
     const [body, sig] = token.split('.');
     const expected = crypto.createHmac('sha256', secret).update(body).digest('base64url');
@@ -127,12 +142,32 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
     try {
       const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
-      if (!payload?.sub || payload.typ !== 'web') return null;
+      if (!payload?.sub) return null;
       if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-      return payload;
+      if (payload.typ === 'web') return payload;
+      if (allowTelegram && payload.typ === 'telegram' && payload.telegramId) return payload;
+      return null;
     } catch {
       return null;
     }
+  }
+
+  function publicTelegramUser(telegramId, subscription) {
+    const tg = String(telegramId);
+    return {
+      id: `tg:${tg}`,
+      email: null,
+      name: null,
+      provider: 'telegram',
+      telegramId: tg,
+      createdAt: undefined,
+      subscription: {
+        active: !!subscription?.active,
+        plan: subscription?.plan || subscription?.type || 'tribute',
+        expiresAt: subscription?.expiresAt ?? null,
+        status: subscription?.status || (subscription?.active ? 'active' : 'none'),
+      },
+    };
   }
 
   function getUserById(id) {
@@ -278,7 +313,9 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     markOrderPaid,
     getOrder,
     publicUser,
+    publicTelegramUser,
     verifyToken,
+    signTelegramToken,
     getUserById,
   };
 }

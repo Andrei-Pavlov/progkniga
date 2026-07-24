@@ -44,7 +44,7 @@ export function Layout() {
       <footer className="footer">
         <div className="shell" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', width: '100%' }}>
           <span>StoryWeaver</span>
-          <span>Сайт и Telegram-вход в приложении — независимы</span>
+          <span>Вход: Telegram (Tribute) или email на сайте</span>
         </div>
       </footer>
     </>

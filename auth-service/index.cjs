@@ -1,6 +1,6 @@
 /**
  * StoryWeaver Auth Service
- * - Desktop: Telegram Mini App + Tribute
+ * - Desktop + website Telegram: Mini App + Tribute
  * - Website: email/password registration, login, subscription (independent)
  *
  * Env: TRIBUTE_API_KEY, TELEGRAM_BOT_TOKEN, AUTH_BASE_URL, WEB_JWT_SECRET, DATA_DIR
@@ -104,7 +104,27 @@ function publicTgSubscription(sub) {
     expiresAt: sub?.expiresAt ?? null,
     status: sub?.status ?? null,
     type: sub?.type ?? null,
+    plan: sub?.type || (isSubscriptionValid(sub) ? 'tribute' : null),
   };
+}
+
+async function resolveTelegramSubscription(telegramId) {
+  const id = String(telegramId);
+  let sub = subscriptions.get(id);
+  if (isSubscriptionValid(sub)) return sub;
+  const fromApi = await checkTributeSubscriber(id);
+  if (fromApi) return upsertSubscription(id, fromApi);
+  const inChannel = await checkChannelMembership(id);
+  if (inChannel) {
+    return upsertSubscription(id, {
+      active: true,
+      expiresAt: null,
+      status: 'active',
+      source: 'channel',
+      type: 'tribute',
+    });
+  }
+  return sub || null;
 }
 
 function getBearerToken(req, url) {
@@ -471,6 +491,7 @@ const server = http.createServer(async (req, res) => {
           done: true,
           expiresAt: Date.now() + 60000,
           subscription: publicTgSubscription(sub),
+          token: webAuth.signTelegramToken(telegramId),
         });
         const chatId = sessionChatMap.get(sessionId);
         if (chatId) {
@@ -526,6 +547,20 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/auth/me' && req.method === 'GET') {
     const token = getBearerToken(req, url);
+    const payload = webAuth.verifyToken(token, { allowTelegram: true });
+    if (!payload) {
+      sendJson(401, { success: false, error: 'Unauthorized' });
+      return;
+    }
+    if (payload.typ === 'telegram') {
+      const sub = await resolveTelegramSubscription(payload.telegramId);
+      const pub = publicTgSubscription(sub);
+      sendJson(200, {
+        success: true,
+        user: webAuth.publicTelegramUser(payload.telegramId, pub),
+      });
+      return;
+    }
     const result = webAuth.me(token);
     if (!result.ok) {
       sendJson(401, { success: false, error: result.error || 'Unauthorized' });
@@ -542,6 +577,18 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/billing/checkout' && req.method === 'POST') {
     const token = getBearerToken(req, url);
+    const payload = webAuth.verifyToken(token, { allowTelegram: true });
+    if (!payload) {
+      sendJson(401, { success: false, error: 'Войдите в аккаунт' });
+      return;
+    }
+    if (payload.typ === 'telegram') {
+      sendJson(400, {
+        success: false,
+        error: 'Подписка Tribute управляется в Telegram. Продлите её через Tribute / канал WeaverStory.',
+      });
+      return;
+    }
     const me = webAuth.me(token);
     if (!me.ok) {
       sendJson(401, { success: false, error: 'Войдите в аккаунт' });
@@ -680,6 +727,7 @@ const server = http.createServer(async (req, res) => {
         success: true,
         telegramId: s.telegramId || null,
         subscription: s.subscription || null,
+        token: s.token || null,
       });
     } else {
       sendJson(200, { success: false });

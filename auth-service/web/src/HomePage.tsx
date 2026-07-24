@@ -33,8 +33,8 @@ export function HomePage() {
             <Link className="btn btn-primary" to="/download">
               Скачать приложение
             </Link>
-            <Link className="btn btn-secondary" to="/register">
-              Создать аккаунт
+            <Link className="btn btn-secondary" to="/login">
+              Войти (Telegram / email)
             </Link>
           </div>
         </div>
@@ -57,22 +57,22 @@ export function HomePage() {
 
       <section className="shell section" id="subscribe">
         <div className="section-head">
-          <h2>Подписка на сайте</h2>
+          <h2>Подписка</h2>
           <p>
-            Регистрация и оплата — прямо на сайте, без Telegram. В приложении вход по-прежнему через
-            Telegram отдельно.
+            Купили через Tribute — войдите через Telegram, чтобы увидеть статус и скачать приложение.
+            Можно также создать отдельный аккаунт на сайте.
           </p>
         </div>
         <div className="panel stack">
           <p className="muted" style={{ margin: 0 }}>
-            1. Регистрация → 2. Пробный период → 3. Оформление подписки
+            Tribute → вход через Telegram → кабинет и скачивание. Либо регистрация email на сайте.
           </p>
           <div className="hero-actions" style={{ width: 'auto', flexDirection: 'row', flexWrap: 'wrap' }}>
-            <Link className="btn btn-primary" to="/subscribe">
-              Тарифы
+            <Link className="btn btn-primary" to="/login">
+              Войти через Telegram
             </Link>
-            <Link className="btn btn-secondary" to="/login">
-              Войти
+            <Link className="btn btn-secondary" to="/subscribe">
+              Тарифы сайта
             </Link>
           </div>
         </div>

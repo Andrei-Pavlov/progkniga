@@ -1,5 +1,7 @@
 export const GITHUB_RELEASES = 'https://github.com/Andrei-Pavlov/progkniga/releases/latest';
 export const STORAGE_TOKEN = 'storyweaver_web_token';
+export const TELEGRAM_BOT = 'StoWeaBot';
+export const TELEGRAM_CHANNEL = 'WeaverStory';
 
 export type SubscriptionInfo = {
   active: boolean;
@@ -10,8 +12,10 @@ export type SubscriptionInfo = {
 
 export type WebUser = {
   id: string;
-  email: string;
+  email?: string | null;
   name?: string | null;
+  provider?: 'email' | 'telegram' | string;
+  telegramId?: string | null;
   createdAt?: string;
   subscription: SubscriptionInfo;
 };
@@ -27,6 +31,13 @@ export type MeResponse = {
   success: boolean;
   user?: WebUser;
   error?: string;
+};
+
+export type SessionPollResponse = {
+  success: boolean;
+  token?: string | null;
+  telegramId?: string | null;
+  subscription?: SubscriptionInfo | null;
 };
 
 export type Plan = {
@@ -64,6 +75,15 @@ export async function fetchMe(token: string): Promise<MeResponse> {
     headers: { Authorization: `Bearer ${token}` },
   });
   return json(res);
+}
+
+export async function pollAuthSession(sessionId: string): Promise<SessionPollResponse> {
+  const res = await fetch(`/auth/session/${encodeURIComponent(sessionId)}`);
+  return json(res);
+}
+
+export function telegramLoginUrl(sessionId: string) {
+  return `https://t.me/${TELEGRAM_BOT}?start=login_${sessionId}`;
 }
 
 export async function fetchPlans(): Promise<{ success: boolean; plans: Plan[]; trialDays?: number }> {
