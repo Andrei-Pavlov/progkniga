@@ -38,8 +38,25 @@ const TRIBUTE_EVENTS = {
 };
 
 let subscriptions = new Map();
-const sessions = new Map(); // sessionId -> { telegramId, done, expiresAt }
+const sessions = new Map(); // sessionId -> { telegramId, done, expiresAt, token, subscription }
 const sessionChatMap = new Map(); // sessionId -> chatId (для отправки статуса подписки в бота)
+const webTokens = new Map(); // token -> { telegramId, expiresAt }
+const SITE_DIR = process.env.SITE_DIR || path.join(__dirname, 'public');
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.map': 'application/json',
+};
 
 function loadSubscriptions() {
   try {
@@ -73,6 +90,69 @@ function isSubscriptionValid(sub) {
   }
   if (sub.status === 'cancelled' && !sub.expiresAt) return false;
   return sub.active !== false;
+}
+
+function publicSubscription(sub) {
+  return {
+    active: isSubscriptionValid(sub),
+    expiresAt: sub?.expiresAt ?? null,
+    status: sub?.status ?? null,
+    type: sub?.type ?? null,
+  };
+}
+
+function issueWebToken(telegramId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  webTokens.set(token, {
+    telegramId: String(telegramId),
+    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+  });
+  return token;
+}
+
+function getBearerToken(req, url) {
+  const auth = req.headers.authorization || '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  return (url.searchParams.get('token') || '').trim();
+}
+
+function resolveWebToken(token) {
+  if (!token) return null;
+  const row = webTokens.get(token);
+  if (!row) return null;
+  if (row.expiresAt && row.expiresAt <= Date.now()) {
+    webTokens.delete(token);
+    return null;
+  }
+  return row;
+}
+
+function tryServeStatic(req, res, urlPath) {
+  if (!fs.existsSync(SITE_DIR)) return false;
+  let rel = decodeURIComponent(urlPath.split('?')[0]);
+  if (rel === '/' || rel === '') rel = '/index.html';
+  // SPA fallback for client routes
+  const candidate = path.normalize(path.join(SITE_DIR, rel));
+  if (!candidate.startsWith(path.normalize(SITE_DIR))) return false;
+
+  let filePath = candidate;
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    const spaRoutes = ['/download', '/login', '/account'];
+    if (spaRoutes.some((r) => rel === r || rel.startsWith(r + '/'))) {
+      filePath = path.join(SITE_DIR, 'index.html');
+    } else if (!fs.existsSync(filePath)) {
+      return false;
+    } else {
+      filePath = path.join(filePath, 'index.html');
+    }
+  }
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return false;
+
+  const ext = path.extname(filePath).toLowerCase();
+  res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
+  res.writeHead(200);
+  fs.createReadStream(filePath).pipe(res);
+  return true;
 }
 
 /** Telegram ID из payload webhook (официально: telegram_user_id) */
@@ -285,7 +365,8 @@ const MINI_APP_HTML = (sessionId, baseUrl) => `<!DOCTYPE html>
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -294,15 +375,31 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url || '/', `http://localhost:${PORT}`);
+  const sendJson = (code, obj) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(code);
+    res.end(JSON.stringify(obj));
+  };
 
-  if (url.pathname === '/' || url.pathname === '') {
-    res.writeHead(200);
-    res.end(JSON.stringify({
+  if (url.pathname === '/api/health' || url.pathname === '/api') {
+    sendJson(200, {
       service: 'StoryWeaver Auth',
       status: 'ok',
       tributeApi: TRIBUTE_API,
       tributeKeyConfigured: Boolean(TRIBUTE_API_KEY),
-    }));
+      site: fs.existsSync(path.join(SITE_DIR, 'index.html')),
+    });
+    return;
+  }
+
+  // Совместимость: старый JSON на / только если сайта нет
+  if ((url.pathname === '/' || url.pathname === '') && !fs.existsSync(path.join(SITE_DIR, 'index.html'))) {
+    sendJson(200, {
+      service: 'StoryWeaver Auth',
+      status: 'ok',
+      tributeApi: TRIBUTE_API,
+      tributeKeyConfigured: Boolean(TRIBUTE_API_KEY),
+    });
     return;
   }
 
@@ -377,19 +474,45 @@ const server = http.createServer(async (req, res) => {
         console.log('[Verify] tgId:', telegramId, '→ OK, подписка активна');
       }
       if (sessionId) {
-        sessions.set(sessionId, { telegramId, done: true, expiresAt: Date.now() + 60000 });
+        const token = issueWebToken(telegramId);
+        sessions.set(sessionId, {
+          telegramId,
+          done: true,
+          expiresAt: Date.now() + 60000,
+          token,
+          subscription: publicSubscription(sub),
+        });
         const chatId = sessionChatMap.get(sessionId);
         if (chatId) {
           sessionChatMap.delete(sessionId);
           sendTelegramMessage(chatId, formatSubscriptionStatus(sub));
         }
       }
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.writeHead(200);
       res.end(JSON.stringify({ success: true }));
     } catch (e) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.writeHead(200);
       res.end(JSON.stringify({ success: false, error: 'Ошибка сервера' }));
     }
+    return;
+  }
+
+  // Кабинет сайта: Bearer token
+  if (url.pathname === '/auth/me' && req.method === 'GET') {
+    const token = getBearerToken(req, url);
+    const row = resolveWebToken(token);
+    if (!row) {
+      sendJson(401, { success: false, error: 'Unauthorized' });
+      return;
+    }
+    const sub = subscriptions.get(row.telegramId);
+    sendJson(200, {
+      success: true,
+      telegramId: row.telegramId,
+      subscription: publicSubscription(sub),
+    });
     return;
   }
 
@@ -457,17 +580,20 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Polling сессии (приложение)
+  // Polling сессии (приложение + сайт)
   if (url.pathname.startsWith('/auth/session/')) {
     const sessionId = url.pathname.replace('/auth/session/', '');
     const s = sessions.get(sessionId);
     if (s?.done) {
       sessions.delete(sessionId);
-      res.writeHead(200);
-      res.end(JSON.stringify({ success: true }));
+      sendJson(200, {
+        success: true,
+        token: s.token || null,
+        telegramId: s.telegramId || null,
+        subscription: s.subscription || null,
+      });
     } else {
-      res.writeHead(200);
-      res.end(JSON.stringify({ success: false }));
+      sendJson(200, { success: false });
     }
     return;
   }
@@ -630,8 +756,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  res.writeHead(404);
-  res.end(JSON.stringify({ error: 'Not found' }));
+  // Статика сайта (SPA)
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    if (tryServeStatic(req, res, url.pathname)) return;
+  }
+
+  sendJson(404, { error: 'Not found' });
 });
 
 function shutdown() {
