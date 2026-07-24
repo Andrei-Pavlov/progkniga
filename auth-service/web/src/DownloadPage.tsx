@@ -6,8 +6,10 @@ import {
   pickDownload,
   type LatestRelease,
 } from './api';
+import { useI18n } from './i18n';
 
 export function DownloadPage() {
+  const { t } = useI18n();
   const [release, setRelease] = useState<LatestRelease | null>(null);
   const [loading, setLoading] = useState(true);
   const platform = useMemo(() => detectPlatform(), []);
@@ -20,40 +22,69 @@ export function DownloadPage() {
 
   const suggested = release ? pickDownload(release.assets, platform) : null;
   const platformLabel =
-    platform === 'windows' ? 'Windows' : platform === 'mac' ? 'macOS' : platform === 'linux' ? 'Linux' : 'ваша ОС';
+    platform === 'windows'
+      ? t('download.os.windows')
+      : platform === 'mac'
+        ? t('download.os.mac')
+        : platform === 'linux'
+          ? t('download.os.linux')
+          : t('download.os.other');
 
   return (
     <main className="shell section">
       <div className="section-head">
-        <h2>Скачать</h2>
-        <p>Десктопное приложение StoryWeaver. Обновления приходят автоматически.</p>
+        <h2>{t('download.title')}</h2>
+        <p>{t('download.lead')}</p>
       </div>
 
       <div className="stack">
         <div className="panel stack">
-          {loading && <p className="muted" style={{ margin: 0 }}>Загрузка…</p>}
+          {loading && (
+            <p className="muted" style={{ margin: 0 }}>
+              {t('download.loading')}
+            </p>
+          )}
           {!loading && release && (
             <>
               <p className="muted" style={{ margin: 0 }}>
-                Версия <strong style={{ color: 'var(--text-primary)' }}>{release.tag_name}</strong>
+                {t('download.version')}{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>{release.tag_name}</strong>
               </p>
               {suggested ? (
                 <a className="btn btn-primary" href={suggested.browser_download_url} style={{ width: 'fit-content' }}>
-                  Скачать для {platformLabel}
+                  {t('download.for')} {platformLabel}
                 </a>
               ) : (
-                <a className="btn btn-primary" href={GITHUB_RELEASES} target="_blank" rel="noreferrer" style={{ width: 'fit-content' }}>
-                  Открыть релизы
+                <a
+                  className="btn btn-primary"
+                  href={GITHUB_RELEASES}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ width: 'fit-content' }}
+                >
+                  {t('download.releases')}
                 </a>
               )}
-              <a className="btn btn-ghost" href={release.html_url} target="_blank" rel="noreferrer" style={{ width: 'fit-content' }}>
-                Все файлы
+              <a
+                className="btn btn-ghost"
+                href={release.html_url}
+                target="_blank"
+                rel="noreferrer"
+                style={{ width: 'fit-content' }}
+              >
+                {t('download.all')}
               </a>
             </>
           )}
           {!loading && !release && (
-            <a className="btn btn-primary" href={GITHUB_RELEASES} target="_blank" rel="noreferrer" style={{ width: 'fit-content' }}>
-              Открыть релизы на GitHub
+            <a
+              className="btn btn-primary"
+              href={GITHUB_RELEASES}
+              target="_blank"
+              rel="noreferrer"
+              style={{ width: 'fit-content' }}
+            >
+              {t('download.github')}
             </a>
           )}
         </div>

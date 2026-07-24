@@ -19,17 +19,17 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
   const PLANS = {
     monthly: {
       id: 'monthly',
-      name: 'Месяц',
-      priceRub: 399,
+      name: 'Monthly',
+      priceUsd: 4.99,
       days: 30,
-      description: 'Полный доступ к StoryWeaver на 30 дней',
+      description: 'Full StoryWeaver access for 30 days',
     },
     yearly: {
       id: 'yearly',
-      name: 'Год',
-      priceRub: 3990,
+      name: 'Yearly',
+      priceUsd: 49.99,
       days: 365,
-      description: 'Полный доступ на год — выгоднее на ~17%',
+      description: 'Full access for a year — about 17% cheaper',
     },
   };
 
@@ -249,7 +249,7 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
       userId: user.id,
       email: user.email,
       planId: plan.id,
-      amountRub: plan.priceRub,
+      amountUsd: plan.priceUsd,
       days: plan.days,
       status: 'pending',
       createdAt: new Date().toISOString(),

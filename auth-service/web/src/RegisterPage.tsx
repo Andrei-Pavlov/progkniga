@@ -1,8 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { register, STORAGE_TOKEN } from './api';
+import { useI18n } from './i18n';
 
 export function RegisterPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -21,13 +23,13 @@ export function RegisterPage() {
     try {
       const res = await register(email, password, name);
       if (!res.success || !res.token) {
-        setError(res.error || 'Не удалось зарегистрироваться');
+        setError(res.error || t('register.fail'));
         return;
       }
       localStorage.setItem(STORAGE_TOKEN, res.token);
       navigate('/account');
     } catch {
-      setError('Ошибка сети');
+      setError(t('register.network'));
     } finally {
       setLoading(false);
     }
@@ -36,14 +38,14 @@ export function RegisterPage() {
   return (
     <main className="shell">
       <form className="login-box panel" onSubmit={onSubmit}>
-        <h1>Регистрация</h1>
+        <h1>{t('register.title')}</h1>
         <p className="muted" style={{ margin: 0 }}>
-          Создайте аккаунт на сайте. После регистрации — пробный период.
+          {t('register.lead')}
         </p>
         <input
           className="field"
           type="text"
-          placeholder="Имя (необязательно)"
+          placeholder={t('register.name')}
           autoComplete="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -51,7 +53,7 @@ export function RegisterPage() {
         <input
           className="field"
           type="email"
-          placeholder="Email"
+          placeholder={t('register.email')}
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -60,19 +62,26 @@ export function RegisterPage() {
         <input
           className="field"
           type="password"
-          placeholder="Пароль (мин. 8 символов)"
+          placeholder={t('register.password')}
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           minLength={8}
           required
         />
-        {error && <p className="danger" style={{ margin: 0, fontSize: 13 }}>{error}</p>}
+        {error && (
+          <p className="danger" style={{ margin: 0, fontSize: 13 }}>
+            {error}
+          </p>
+        )}
         <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: '100%' }}>
-          {loading ? 'Создание…' : 'Создать аккаунт'}
+          {loading ? t('register.submitting') : t('register.submit')}
         </button>
         <p className="muted" style={{ margin: 0 }}>
-          Уже есть аккаунт? <Link to="/login" style={{ color: 'var(--accent-hover)', textDecoration: 'underline' }}>Войти</Link>
+          {t('register.haveAccount')}{' '}
+          <Link to="/login" style={{ color: 'var(--accent-hover)', textDecoration: 'underline' }}>
+            {t('register.login')}
+          </Link>
         </p>
       </form>
     </main>

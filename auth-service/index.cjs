@@ -607,7 +607,8 @@ const server = http.createServer(async (req, res) => {
         payUrl = PAYMENT_URL
           .replace('{orderId}', created.order.id)
           .replace('{email}', encodeURIComponent(created.order.email))
-          .replace('{amount}', String(created.order.amountRub))
+          .replace('{amount}', String(created.order.amountUsd))
+          .replace('{currency}', 'USD')
           .replace('{plan}', created.order.planId);
       }
       sendJson(200, {

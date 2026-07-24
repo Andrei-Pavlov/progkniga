@@ -8,8 +8,10 @@ import {
   TELEGRAM_CHANNEL,
   telegramLoginUrl,
 } from './api';
+import { useI18n } from './i18n';
 
 export function LoginPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,7 +52,7 @@ export function LoginPage() {
       setQrDataUrl(dataUrl);
     } catch {
       setTgLoading(false);
-      setError('Не удалось сгенерировать QR-код');
+      setError(t('login.qrFail'));
       return;
     }
 
@@ -72,7 +74,7 @@ export function LoginPage() {
     setTimeout(() => {
       if (doneRef.current) return;
       stopTelegram();
-      setError('Время вышло. Попробуйте снова.');
+      setError(t('login.timeout'));
     }, 120000);
   };
 
@@ -83,13 +85,13 @@ export function LoginPage() {
     try {
       const res = await login(email, password);
       if (!res.success || !res.token) {
-        setError(res.error || 'Не удалось войти');
+        setError(res.error || t('login.fail'));
         return;
       }
       localStorage.setItem(STORAGE_TOKEN, res.token);
       navigate('/account');
     } catch {
-      setError('Ошибка сети');
+      setError(t('login.network'));
     } finally {
       setLoading(false);
     }
@@ -98,9 +100,9 @@ export function LoginPage() {
   return (
     <main className="shell">
       <div className="login-box panel" style={{ gap: 16 }}>
-        <h1>Вход</h1>
+        <h1>{t('login.title')}</h1>
         <p className="muted" style={{ margin: 0 }}>
-          Подписка Tribute — через Telegram. Аккаунт сайта — email.
+          {t('login.lead')}
         </p>
 
         <button
@@ -110,25 +112,25 @@ export function LoginPage() {
           onClick={startTelegram}
           style={{ width: '100%' }}
         >
-          {tgLoading ? 'Откройте Telegram…' : 'Войти через Telegram (Tribute)'}
+          {tgLoading ? t('login.tg.loading') : t('login.tg')}
         </button>
         <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-          Нужна активная подписка Tribute и канал t.me/{TELEGRAM_CHANNEL}
+          {t('login.tg.need')} t.me/{TELEGRAM_CHANNEL}
         </p>
 
         {qrDataUrl && (
           <div className="stack" style={{ alignItems: 'center', textAlign: 'center' }}>
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              Отсканируйте QR или откройте ссылку в Telegram
+              {t('login.qr')}
             </p>
             <img src={qrDataUrl} alt="QR Telegram" width={220} height={220} style={{ borderRadius: 8 }} />
             {authUrl && (
               <a className="btn btn-secondary" href={authUrl} target="_blank" rel="noreferrer">
-                Открыть бота
+                {t('login.openBot')}
               </a>
             )}
             <button type="button" className="btn btn-ghost" onClick={stopTelegram}>
-              Отмена
+              {t('login.cancel')}
             </button>
           </div>
         )}
@@ -144,7 +146,7 @@ export function LoginPage() {
           }}
         >
           <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-          или email
+          {t('login.orEmail')}
           <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
         </div>
 
@@ -152,7 +154,7 @@ export function LoginPage() {
           <input
             className="field"
             type="email"
-            placeholder="Email"
+            placeholder={t('login.email')}
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -161,14 +163,14 @@ export function LoginPage() {
           <input
             className="field"
             type="password"
-            placeholder="Пароль"
+            placeholder={t('login.password')}
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
           <button type="submit" className="btn btn-secondary" disabled={loading || tgLoading} style={{ width: '100%' }}>
-            {loading ? 'Вход…' : 'Войти по email'}
+            {loading ? t('login.submitting') : t('login.submit')}
           </button>
         </form>
 
@@ -178,9 +180,9 @@ export function LoginPage() {
           </p>
         )}
         <p className="muted" style={{ margin: 0 }}>
-          Нет аккаунта сайта?{' '}
+          {t('login.noAccount')}{' '}
           <Link to="/register" style={{ color: 'var(--accent-hover)', textDecoration: 'underline' }}>
-            Регистрация
+            {t('login.register')}
           </Link>
         </p>
       </div>

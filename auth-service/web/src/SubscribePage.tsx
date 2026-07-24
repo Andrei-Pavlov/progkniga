@@ -8,8 +8,10 @@ import {
   TELEGRAM_CHANNEL,
   type Plan,
 } from './api';
+import { formatUsd, useI18n } from './i18n';
 
 export function SubscribePage() {
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [trialDays, setTrialDays] = useState(7);
@@ -51,7 +53,7 @@ export function SubscribePage() {
     try {
       const res = await checkout(token, planId);
       if (!res.success) {
-        setError(res.error || 'Не удалось создать заказ');
+        setError(res.error || t('subscribe.orderFail'));
         return;
       }
       if (res.payUrl) {
@@ -59,19 +61,22 @@ export function SubscribePage() {
         return;
       }
       setMessage(
-        `${res.message || 'Заказ создан.'} Номер заказа: ${res.order?.id || '—'}. Сохраните его для активации.`
+        `${res.message || ''} Order: ${res.order?.id || '—'} · ${formatUsd(res.order?.amountUsd || 0, locale)}`
       );
     } catch {
-      setError('Ошибка сети');
+      setError(t('subscribe.network'));
     } finally {
       setBusy(null);
     }
   };
 
+  const planName = (id: string) => t(`plan.${id}.name`);
+  const planDesc = (id: string) => t(`plan.${id}.desc`);
+
   if (loading) {
     return (
       <main className="shell section">
-        <p className="muted">Загрузка…</p>
+        <p className="muted">{t('subscribe.loading')}</p>
       </main>
     );
   }
@@ -80,19 +85,18 @@ export function SubscribePage() {
     return (
       <main className="shell section">
         <div className="section-head">
-          <h2>Подписка Tribute</h2>
+          <h2>{t('subscribe.tg.title')}</h2>
           <p>
-            Вы вошли через Telegram. Продление и статус оплаты — в Tribute и канале t.me/
-            {TELEGRAM_CHANNEL.replace(/^@/, '')}.
+            {t('subscribe.tg.lead')} t.me/{TELEGRAM_CHANNEL.replace(/^@/, '')}
           </p>
         </div>
         <div className="panel stack">
           <p className="muted" style={{ margin: 0 }}>
-            В кабинете можно посмотреть, активна ли подписка, и скачать приложение.
+            {t('subscribe.tg.body')}
           </p>
           <div className="hero-actions" style={{ width: 'auto', flexDirection: 'row', flexWrap: 'wrap' }}>
             <Link className="btn btn-primary" to="/account">
-              В кабинет
+              {t('subscribe.account')}
             </Link>
             <a
               className="btn btn-secondary"
@@ -100,7 +104,7 @@ export function SubscribePage() {
               target="_blank"
               rel="noreferrer"
             >
-              Открыть канал
+              {t('subscribe.tg.channel')}
             </a>
           </div>
         </div>
@@ -111,25 +115,22 @@ export function SubscribePage() {
   return (
     <main className="shell section">
       <div className="section-head">
-        <h2>Подписка на сайте</h2>
-        <p>
-          Оформите доступ email-аккаунтом. Пробный период при регистрации — {trialDays} дн. Если
-          оплатили через Tribute — войдите через Telegram.
-        </p>
+        <h2>{t('subscribe.title')}</h2>
+        <p>{t('subscribe.lead', { days: trialDays })}</p>
       </div>
 
       <div className="download-grid">
         {plans.map((p) => (
           <div key={p.id} className="download-card panel" style={{ background: 'rgba(24,24,31,0.78)' }}>
-            <h3>{p.name}</h3>
+            <h3>{planName(p.id)}</h3>
             <p className="muted" style={{ margin: 0 }}>
-              {p.description}
+              {planDesc(p.id)}
             </p>
             <div className="stat-value" style={{ fontSize: 22 }}>
-              {p.priceRub} ₽
+              {formatUsd(p.priceUsd, locale)}
             </div>
             <button type="button" className="btn btn-primary" disabled={!!busy} onClick={() => buy(p.id)}>
-              {busy === p.id ? 'Оформление…' : 'Оформить'}
+              {busy === p.id ? t('subscribe.buying') : t('subscribe.buy')}
             </button>
           </div>
         ))}
@@ -140,10 +141,10 @@ export function SubscribePage() {
 
       <div className="hero-actions" style={{ marginTop: 24, flexDirection: 'row', width: 'auto' }}>
         <Link className="btn btn-secondary" to="/account">
-          В кабинет
+          {t('subscribe.account')}
         </Link>
         <Link className="btn btn-ghost" to="/login">
-          Вход через Telegram
+          {t('subscribe.tgLogin')}
         </Link>
       </div>
     </main>

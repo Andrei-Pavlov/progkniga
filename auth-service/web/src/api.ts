@@ -43,7 +43,7 @@ export type SessionPollResponse = {
 export type Plan = {
   id: string;
   name: string;
-  priceRub: number;
+  priceUsd: number;
   days: number;
   description: string;
 };
@@ -102,7 +102,7 @@ export async function checkout(token: string, planId: string) {
   });
   return json<{
     success: boolean;
-    order?: { id: string; amountRub: number; planId: string; status: string };
+    order?: { id: string; amountUsd: number; planId: string; status: string };
     plan?: Plan;
     payUrl?: string | null;
     message?: string;
