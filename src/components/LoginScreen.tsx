@@ -134,7 +134,7 @@ export function LoginScreen() {
       </div>
       {error && <p style={{ color: 'var(--error)', margin: 0, fontSize: 13 }}>{error}</p>}
       <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: 12, textAlign: 'center', maxWidth: 320 }}>
-        Подпишитесь на t.me/{TELEGRAM_CHANNEL} через Tribute. Вход проверяет подписку автоматически.
+        Оплатите подписку через Tribute, затем подпишитесь на канал t.me/{TELEGRAM_CHANNEL}. Вход проверяет оба шага.
       </p>
 
       <div

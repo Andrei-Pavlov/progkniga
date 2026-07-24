@@ -57,6 +57,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTH_SERVICE_URL: https://progkniga-production.up.railway.app
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: 'StoryWeaver v__VERSION__'
@@ -64,3 +66,5 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }} --verbose
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
