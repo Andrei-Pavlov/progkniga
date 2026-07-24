@@ -71,20 +71,21 @@ export function LoginPage() {
 
   return (
     <main className="shell">
-      <div className="panel login-box stack">
-        <h1>Вход</h1>
+      <div className="login-box">
+        <h1>StoryWeaver</h1>
         <p className="muted" style={{ margin: 0 }}>
-          Через Telegram-бота {TELEGRAM_BOT}. Нужна активная подписка Tribute и канал{' '}
-          {TELEGRAM_CHANNEL}.
+          Профессиональное приложение для писателей
         </p>
 
         {!qr ? (
-          <button type="button" className="btn btn-primary" onClick={startLogin} disabled={loading}>
-            Войти через Telegram
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 'min(320px, 100%)', marginTop: 8 }}>
+            <button type="button" className="btn btn-primary" onClick={startLogin} disabled={loading}>
+              {loading ? 'Откройте Telegram и нажмите кнопку...' : 'Войти через Telegram'}
+            </button>
+          </div>
         ) : (
           <>
-            <p className="muted" style={{ margin: 0 }}>
+            <p className="muted" style={{ margin: 0, maxWidth: 320 }}>
               Отсканируйте QR или откройте ссылку в Telegram, затем нажмите кнопку в боте.
             </p>
             <div className="qr-wrap">
@@ -98,12 +99,17 @@ export function LoginPage() {
           </>
         )}
 
-        {error && <p className="danger">{error}</p>}
+        {error && <p className="danger" style={{ margin: 0, fontSize: 13 }}>{error}</p>}
+
+        <p className="muted" style={{ margin: 0, maxWidth: 320, textAlign: 'center' }}>
+          Оплатите подписку через Tribute, затем подпишитесь на канал t.me/{TELEGRAM_CHANNEL}. Вход
+          проверяет оба шага.
+        </p>
 
         <a className="btn btn-ghost" href={TRIBUTE_CHANNEL_URL} target="_blank" rel="noreferrer">
           Оформить подписку
         </a>
-        <Link className="muted" to="/">
+        <Link className="muted" to="/" style={{ fontSize: 12, textDecoration: 'underline' }}>
           На главную
         </Link>
       </div>

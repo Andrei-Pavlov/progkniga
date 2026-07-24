@@ -12,8 +12,8 @@ export function Layout() {
 
   return (
     <>
-      <header className="shell">
-        <nav className="nav">
+      <header className="nav">
+        <div className="nav-inner">
           <Link to="/" className="brand">
             StoryWeaver
           </Link>
@@ -31,17 +31,19 @@ export function Layout() {
               <NavLink to="/login">Войти</NavLink>
             )}
           </div>
-        </nav>
+        </div>
       </header>
       <Outlet />
-      <footer className="shell footer">
-        <span>StoryWeaver — офлайн-инструмент для писателей</span>
-        <span>
-          Канал{' '}
-          <a href="https://t.me/WeaverStory" target="_blank" rel="noreferrer">
-            t.me/WeaverStory
-          </a>
-        </span>
+      <footer className="footer">
+        <div className="shell" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', width: '100%' }}>
+          <span>StoryWeaver</span>
+          <span>
+            Канал{' '}
+            <a href="https://t.me/WeaverStory" target="_blank" rel="noreferrer">
+              t.me/WeaverStory
+            </a>
+          </span>
+        </div>
       </footer>
     </>
   );

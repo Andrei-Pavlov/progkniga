@@ -19,43 +19,40 @@ export function DownloadPage() {
   }, []);
 
   const suggested = release ? pickDownload(release.assets, platform) : null;
-
   const platformLabel =
     platform === 'windows' ? 'Windows' : platform === 'mac' ? 'macOS' : platform === 'linux' ? 'Linux' : 'ваша ОС';
 
   return (
     <main className="shell section">
       <div className="section-head">
-        <h2>Скачать StoryWeaver</h2>
-        <p>
-          Установите десктопное приложение. Обновления приходят автоматически с GitHub Releases.
-        </p>
+        <h2>Скачать</h2>
+        <p>Десктопное приложение StoryWeaver. Обновления приходят автоматически.</p>
       </div>
 
       <div className="stack">
         <div className="panel stack">
-          {loading && <p className="muted">Загружаем последнюю версию…</p>}
+          {loading && <p className="muted" style={{ margin: 0 }}>Загрузка…</p>}
           {!loading && release && (
             <>
-              <p style={{ margin: 0 }}>
-                Актуальная версия: <strong>{release.tag_name}</strong>
+              <p className="muted" style={{ margin: 0 }}>
+                Версия <strong style={{ color: 'var(--text-primary)' }}>{release.tag_name}</strong>
               </p>
               {suggested ? (
-                <a className="btn btn-primary" href={suggested.browser_download_url}>
+                <a className="btn btn-primary" href={suggested.browser_download_url} style={{ width: 'fit-content' }}>
                   Скачать для {platformLabel}
                 </a>
               ) : (
-                <a className="btn btn-primary" href={GITHUB_RELEASES} target="_blank" rel="noreferrer">
-                  Открыть релизы на GitHub
+                <a className="btn btn-primary" href={GITHUB_RELEASES} target="_blank" rel="noreferrer" style={{ width: 'fit-content' }}>
+                  Открыть релизы
                 </a>
               )}
-              <a className="btn btn-ghost" href={release.html_url} target="_blank" rel="noreferrer">
-                Все файлы релиза
+              <a className="btn btn-ghost" href={release.html_url} target="_blank" rel="noreferrer" style={{ width: 'fit-content' }}>
+                Все файлы
               </a>
             </>
           )}
           {!loading && !release && (
-            <a className="btn btn-primary" href={GITHUB_RELEASES} target="_blank" rel="noreferrer">
+            <a className="btn btn-primary" href={GITHUB_RELEASES} target="_blank" rel="noreferrer" style={{ width: 'fit-content' }}>
               Открыть релизы на GitHub
             </a>
           )}
