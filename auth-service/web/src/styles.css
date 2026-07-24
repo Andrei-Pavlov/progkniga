@@ -222,6 +222,37 @@ input {
   color: var(--text-primary);
 }
 
+.field {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.field:focus {
+  border-color: var(--accent);
+}
+
+.login-box {
+  width: min(400px, 100%);
+  margin: 64px auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.login-box h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0;
+}
+
 main {
   flex: 1;
 }
@@ -425,22 +456,6 @@ main {
   font-size: 13px;
   font-weight: 500;
   word-break: break-all;
-}
-
-.login-box {
-  width: min(400px, 100%);
-  margin: 64px auto;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.login-box h1 {
-  font-size: 32px;
-  font-weight: 600;
-  margin: 0;
 }
 
 .qr-wrap {

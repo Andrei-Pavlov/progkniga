@@ -1,12 +1,9 @@
 /**
  * StoryWeaver Auth Service
- * - Канал t.me/WeaverStory, Tribute (@tribute) API v1
- * - Бот для входа через Telegram Mini App (безопасная верификация)
+ * - Desktop: Telegram Mini App + Tribute
+ * - Website: email/password registration, login, subscription (independent)
  *
- * Tribute OpenAPI: https://tribute.tg/api/v1/openapi/en
- * Docs: https://wiki.tribute.tg/for-content-creators/api-documentation
- *
- * Env: TRIBUTE_API_KEY, TELEGRAM_BOT_TOKEN, AUTH_BASE_URL (публичный URL для Mini App)
+ * Env: TRIBUTE_API_KEY, TELEGRAM_BOT_TOKEN, AUTH_BASE_URL, WEB_JWT_SECRET, DATA_DIR
  */
 
 const path = require('path');
@@ -17,19 +14,29 @@ const http = require('http');
 const crypto = require('crypto');
 const { URL } = require('url');
 const { isValid, parse } = require('@tma.js/init-data-node');
+const { createWebAuth } = require('./webAuth.cjs');
 
 const PORT = Number(process.env.PORT) || 3847;
 const TRIBUTE_API = (process.env.TRIBUTE_API_URL || 'https://tribute.tg/api/v1').replace(/\/$/, '');
 const TRIBUTE_API_KEY = process.env.TRIBUTE_API_KEY || '';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const AUTH_BASE_URL = (process.env.AUTH_BASE_URL || '').replace(/\/$/, '');
-// Канал для проверки подписки (@WeaverStory). Бот должен быть админом канала.
 const TELEGRAM_CHANNEL = (process.env.TELEGRAM_CHANNEL || 'WeaverStory').replace(/^@?/, '@');
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
-// Railway: примонтируйте Volume к /data, задайте DATA_DIR=/data — иначе subscriptions сбрасываются при каждом деплое
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 const SUBS_FILE = path.join(DATA_DIR, 'subscriptions.json');
+const WEB_JWT_SECRET = process.env.WEB_JWT_SECRET || '';
+const WEB_TRIAL_DAYS = Number(process.env.WEB_TRIAL_DAYS ?? 7);
+const PAYMENT_URL = (process.env.PAYMENT_URL || '').trim();
 
+const webAuth = createWebAuth({
+  dataDir: DATA_DIR,
+  jwtSecret: WEB_JWT_SECRET || undefined,
+  trialDays: Number.isFinite(WEB_TRIAL_DAYS) ? WEB_TRIAL_DAYS : 7,
+});
+if (!WEB_JWT_SECRET) {
+  console.warn('[WebAuth] WEB_JWT_SECRET not set — using ephemeral secret (tokens reset on restart)');
+}
 /** Официальные имена webhook-событий Tribute (OpenAPI webhooks) */
 const TRIBUTE_EVENTS = {
   NEW: 'new_subscription',
@@ -39,8 +46,7 @@ const TRIBUTE_EVENTS = {
 
 let subscriptions = new Map();
 const sessions = new Map(); // sessionId -> { telegramId, done, expiresAt, token, subscription }
-const sessionChatMap = new Map(); // sessionId -> chatId (для отправки статуса подписки в бота)
-const webTokens = new Map(); // token -> { telegramId, expiresAt }
+const sessionChatMap = new Map(); // sessionId -> chatId
 const SITE_DIR = process.env.SITE_DIR || path.join(__dirname, 'public');
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -92,7 +98,7 @@ function isSubscriptionValid(sub) {
   return sub.active !== false;
 }
 
-function publicSubscription(sub) {
+function publicTgSubscription(sub) {
   return {
     active: isSubscriptionValid(sub),
     expiresAt: sub?.expiresAt ?? null,
@@ -101,43 +107,29 @@ function publicSubscription(sub) {
   };
 }
 
-function issueWebToken(telegramId) {
-  const token = crypto.randomBytes(32).toString('hex');
-  webTokens.set(token, {
-    telegramId: String(telegramId),
-    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-  });
-  return token;
-}
-
 function getBearerToken(req, url) {
   const auth = req.headers.authorization || '';
   if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
   return (url.searchParams.get('token') || '').trim();
 }
 
-function resolveWebToken(token) {
-  if (!token) return null;
-  const row = webTokens.get(token);
-  if (!row) return null;
-  if (row.expiresAt && row.expiresAt <= Date.now()) {
-    webTokens.delete(token);
-    return null;
-  }
-  return row;
+async function readJsonBody(req) {
+  let body = '';
+  for await (const chunk of req) body += chunk;
+  if (!body) return {};
+  return JSON.parse(body);
 }
 
 function tryServeStatic(req, res, urlPath) {
   if (!fs.existsSync(SITE_DIR)) return false;
   let rel = decodeURIComponent(urlPath.split('?')[0]);
   if (rel === '/' || rel === '') rel = '/index.html';
-  // SPA fallback for client routes
   const candidate = path.normalize(path.join(SITE_DIR, rel));
   if (!candidate.startsWith(path.normalize(SITE_DIR))) return false;
 
   let filePath = candidate;
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    const spaRoutes = ['/download', '/login', '/account'];
+    const spaRoutes = ['/download', '/login', '/register', '/account', '/subscribe'];
     if (spaRoutes.some((r) => rel === r || rel.startsWith(r + '/'))) {
       filePath = path.join(SITE_DIR, 'index.html');
     } else if (!fs.existsSync(filePath)) {
@@ -474,13 +466,11 @@ const server = http.createServer(async (req, res) => {
         console.log('[Verify] tgId:', telegramId, '→ OK, подписка активна');
       }
       if (sessionId) {
-        const token = issueWebToken(telegramId);
         sessions.set(sessionId, {
           telegramId,
           done: true,
           expiresAt: Date.now() + 60000,
-          token,
-          subscription: publicSubscription(sub),
+          subscription: publicTgSubscription(sub),
         });
         const chatId = sessionChatMap.get(sessionId);
         if (chatId) {
@@ -499,24 +489,124 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Кабинет сайта: Bearer token
-  if (url.pathname === '/auth/me' && req.method === 'GET') {
-    const token = getBearerToken(req, url);
-    const row = resolveWebToken(token);
-    if (!row) {
-      sendJson(401, { success: false, error: 'Unauthorized' });
-      return;
+  // --- Website email auth (independent from Telegram) ---
+  if (url.pathname === '/auth/register' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const result = webAuth.register({
+        email: body.email,
+        password: body.password,
+        name: body.name,
+      });
+      if (!result.ok) {
+        sendJson(400, { success: false, error: result.error });
+        return;
+      }
+      sendJson(200, { success: true, token: result.token, user: result.user });
+    } catch (e) {
+      sendJson(400, { success: false, error: 'Некорректный запрос' });
     }
-    const sub = subscriptions.get(row.telegramId);
-    sendJson(200, {
-      success: true,
-      telegramId: row.telegramId,
-      subscription: publicSubscription(sub),
-    });
     return;
   }
 
-  // Список подписчиков — localhost или ?token=ADMIN_TOKEN
+  if (url.pathname === '/auth/login' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const result = webAuth.login({ email: body.email, password: body.password });
+      if (!result.ok) {
+        sendJson(401, { success: false, error: result.error });
+        return;
+      }
+      sendJson(200, { success: true, token: result.token, user: result.user });
+    } catch (e) {
+      sendJson(400, { success: false, error: 'Некорректный запрос' });
+    }
+    return;
+  }
+
+  if (url.pathname === '/auth/me' && req.method === 'GET') {
+    const token = getBearerToken(req, url);
+    const result = webAuth.me(token);
+    if (!result.ok) {
+      sendJson(401, { success: false, error: result.error || 'Unauthorized' });
+      return;
+    }
+    sendJson(200, { success: true, user: result.user });
+    return;
+  }
+
+  if (url.pathname === '/billing/plans' && req.method === 'GET') {
+    sendJson(200, { success: true, plans: webAuth.listPlans(), trialDays: WEB_TRIAL_DAYS });
+    return;
+  }
+
+  if (url.pathname === '/billing/checkout' && req.method === 'POST') {
+    const token = getBearerToken(req, url);
+    const me = webAuth.me(token);
+    if (!me.ok) {
+      sendJson(401, { success: false, error: 'Войдите в аккаунт' });
+      return;
+    }
+    try {
+      const body = await readJsonBody(req);
+      const fullUser = webAuth.getUserById(me.user.id);
+      const created = webAuth.createOrder(fullUser, body.planId);
+      if (!created.ok) {
+        sendJson(400, { success: false, error: created.error });
+        return;
+      }
+      let payUrl = null;
+      if (PAYMENT_URL) {
+        payUrl = PAYMENT_URL
+          .replace('{orderId}', created.order.id)
+          .replace('{email}', encodeURIComponent(created.order.email))
+          .replace('{amount}', String(created.order.amountRub))
+          .replace('{plan}', created.order.planId);
+      }
+      sendJson(200, {
+        success: true,
+        order: created.order,
+        plan: created.plan,
+        payUrl,
+        message: payUrl
+          ? 'Перейдите по ссылке для оплаты'
+          : 'Заказ создан. После оплаты доступ активирует администратор (или укажите PAYMENT_URL).',
+      });
+    } catch (e) {
+      sendJson(400, { success: false, error: 'Некорректный запрос' });
+    }
+    return;
+  }
+
+  // Admin: activate web subscription
+  if (url.pathname === '/billing/activate' && req.method === 'GET') {
+    const token = url.searchParams.get('token');
+    const email = url.searchParams.get('email');
+    const planId = url.searchParams.get('plan') || 'monthly';
+    const orderId = url.searchParams.get('orderId');
+    const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
+    const remote = forwarded || req.socket?.remoteAddress || '';
+    const isLocal = /^(127\.|::1|localhost)/.test(remote) || remote === '';
+    const hasToken = ADMIN_TOKEN && token === ADMIN_TOKEN;
+    if (!isLocal && !hasToken) {
+      sendJson(403, { error: 'Only localhost or valid token' });
+      return;
+    }
+    if (orderId) {
+      const paid = webAuth.markOrderPaid(orderId);
+      sendJson(paid.ok ? 200 : 400, paid.ok ? { success: true, user: paid.user, order: paid.order } : { success: false, error: paid.error });
+      return;
+    }
+    if (!email) {
+      sendJson(400, { success: false, error: 'Укажите email или orderId' });
+      return;
+    }
+    const activated = webAuth.activateSubscription(email, planId);
+    sendJson(activated.ok ? 200 : 400, activated.ok ? { success: true, user: activated.user } : { success: false, error: activated.error });
+    return;
+  }
+
+  // Список подписчиков Telegram — localhost или ?token=ADMIN_TOKEN
   if (url.pathname === '/auth/subscribers' && req.method === 'GET') {
     const token = url.searchParams.get('token');
     const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
@@ -588,7 +678,6 @@ const server = http.createServer(async (req, res) => {
       sessions.delete(sessionId);
       sendJson(200, {
         success: true,
-        token: s.token || null,
         telegramId: s.telegramId || null,
         subscription: s.subscription || null,
       });

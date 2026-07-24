@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { TRIBUTE_CHANNEL_URL } from './api';
 
 const FEATURES = [
   {
@@ -34,8 +33,8 @@ export function HomePage() {
             <Link className="btn btn-primary" to="/download">
               Скачать приложение
             </Link>
-            <Link className="btn btn-secondary" to="/login">
-              Войти через Telegram
+            <Link className="btn btn-secondary" to="/register">
+              Создать аккаунт
             </Link>
           </div>
         </div>
@@ -58,21 +57,22 @@ export function HomePage() {
 
       <section className="shell section" id="subscribe">
         <div className="section-head">
-          <h2>Подписка</h2>
+          <h2>Подписка на сайте</h2>
           <p>
-            Оплатите через Tribute, затем подпишитесь на канал WeaverStory. Вход проверяет оба шага.
+            Регистрация и оплата — прямо на сайте, без Telegram. В приложении вход по-прежнему через
+            Telegram отдельно.
           </p>
         </div>
         <div className="panel stack">
           <p className="muted" style={{ margin: 0 }}>
-            1. Оплата в Tribute → 2. Канал WeaverStory → 3. Вход через Telegram
+            1. Регистрация → 2. Пробный период → 3. Оформление подписки
           </p>
           <div className="hero-actions" style={{ width: 'auto', flexDirection: 'row', flexWrap: 'wrap' }}>
-            <a className="btn btn-primary" href={TRIBUTE_CHANNEL_URL} target="_blank" rel="noreferrer">
-              Открыть канал
-            </a>
+            <Link className="btn btn-primary" to="/subscribe">
+              Тарифы
+            </Link>
             <Link className="btn btn-secondary" to="/login">
-              Уже оплатил — войти
+              Войти
             </Link>
           </div>
         </div>

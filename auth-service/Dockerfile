@@ -9,7 +9,7 @@ FROM node:20-alpine
 WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
-COPY index.cjs ./
+COPY index.cjs webAuth.cjs ./
 COPY --from=web /web/dist ./public
 EXPOSE 3847
 CMD ["node", "index.cjs"]

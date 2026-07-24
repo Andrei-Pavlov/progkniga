@@ -21,7 +21,7 @@ export function Layout() {
           </Link>
           <div className="nav-links">
             <NavLink to="/download">Скачать</NavLink>
-            {!token && <a href="/#subscribe">Подписка</a>}
+            <NavLink to="/subscribe">Подписка</NavLink>
             {token ? (
               <>
                 <NavLink to="/account">Кабинет</NavLink>
@@ -30,7 +30,10 @@ export function Layout() {
                 </button>
               </>
             ) : (
-              <NavLink to="/login">Войти</NavLink>
+              <>
+                <NavLink to="/login">Войти</NavLink>
+                <NavLink to="/register">Регистрация</NavLink>
+              </>
             )}
           </div>
         </div>
@@ -41,12 +44,7 @@ export function Layout() {
       <footer className="footer">
         <div className="shell" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', width: '100%' }}>
           <span>StoryWeaver</span>
-          <span>
-            Канал{' '}
-            <a href="https://t.me/WeaverStory" target="_blank" rel="noreferrer">
-              t.me/WeaverStory
-            </a>
-          </span>
+          <span>Сайт и Telegram-вход в приложении — независимы</span>
         </div>
       </footer>
     </>

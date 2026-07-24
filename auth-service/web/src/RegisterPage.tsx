@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { login, STORAGE_TOKEN } from './api';
+import { register, STORAGE_TOKEN } from './api';
 
-export function LoginPage() {
+export function RegisterPage() {
   const navigate = useNavigate();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,9 +19,9 @@ export function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await login(email, password);
+      const res = await register(email, password, name);
       if (!res.success || !res.token) {
-        setError(res.error || 'Не удалось войти');
+        setError(res.error || 'Не удалось зарегистрироваться');
         return;
       }
       localStorage.setItem(STORAGE_TOKEN, res.token);
@@ -35,10 +36,18 @@ export function LoginPage() {
   return (
     <main className="shell">
       <form className="login-box panel" onSubmit={onSubmit}>
-        <h1>Вход</h1>
+        <h1>Регистрация</h1>
         <p className="muted" style={{ margin: 0 }}>
-          Аккаунт сайта StoryWeaver (не связан с Telegram)
+          Создайте аккаунт на сайте. После регистрации — пробный период.
         </p>
+        <input
+          className="field"
+          type="text"
+          placeholder="Имя (необязательно)"
+          autoComplete="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
         <input
           className="field"
           type="email"
@@ -51,18 +60,19 @@ export function LoginPage() {
         <input
           className="field"
           type="password"
-          placeholder="Пароль"
-          autoComplete="current-password"
+          placeholder="Пароль (мин. 8 символов)"
+          autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          minLength={8}
           required
         />
         {error && <p className="danger" style={{ margin: 0, fontSize: 13 }}>{error}</p>}
         <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: '100%' }}>
-          {loading ? 'Вход…' : 'Войти'}
+          {loading ? 'Создание…' : 'Создать аккаунт'}
         </button>
         <p className="muted" style={{ margin: 0 }}>
-          Нет аккаунта? <Link to="/register" style={{ color: 'var(--accent-hover)', textDecoration: 'underline' }}>Регистрация</Link>
+          Уже есть аккаунт? <Link to="/login" style={{ color: 'var(--accent-hover)', textDecoration: 'underline' }}>Войти</Link>
         </p>
       </form>
     </main>
