@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import {
   login,
   pollAuthSession,
+  resendVerification,
   STORAGE_TOKEN,
   TELEGRAM_CHANNEL,
   telegramLoginUrl,
@@ -11,24 +12,31 @@ import {
 import { useI18n } from './i18n';
 
 export function LoginPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [tgLoading, setTgLoading] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [needResend, setNeedResend] = useState(false);
+  const [resending, setResending] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const doneRef = useRef(false);
 
   useEffect(() => {
     if (localStorage.getItem(STORAGE_TOKEN)) navigate('/account', { replace: true });
+    const verify = searchParams.get('verify');
+    if (verify === 'ok') setInfo(t('login.verifyOk'));
+    if (verify === 'fail') setError(t('login.verifyFail'));
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [navigate]);
+  }, [navigate, searchParams, t]);
 
   const stopTelegram = () => {
     if (pollRef.current) {
@@ -82,10 +90,13 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setInfo('');
+    setNeedResend(false);
     try {
       const res = await login(email, password);
       if (!res.success || !res.token) {
         setError(res.error || t('login.fail'));
+        if (res.needVerification) setNeedResend(true);
         return;
       }
       localStorage.setItem(STORAGE_TOKEN, res.token);
@@ -94,6 +105,25 @@ export function LoginPage() {
       setError(t('login.network'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onResend = async () => {
+    if (!email.trim()) return;
+    setResending(true);
+    setError('');
+    setInfo('');
+    try {
+      const res = await resendVerification(email.trim(), locale);
+      if (!res.success) {
+        setError(res.error || t('register.resendFail'));
+        return;
+      }
+      setInfo(t('register.resendOk'));
+    } catch {
+      setError(t('register.resendFail'));
+    } finally {
+      setResending(false);
     }
   };
 
@@ -174,10 +204,20 @@ export function LoginPage() {
           </button>
         </form>
 
+        {info && (
+          <p className="ok" style={{ margin: 0, fontSize: 13 }}>
+            {info}
+          </p>
+        )}
         {error && (
           <p className="danger" style={{ margin: 0, fontSize: 13 }}>
             {error}
           </p>
+        )}
+        {needResend && (
+          <button type="button" className="btn btn-ghost" disabled={resending} onClick={onResend} style={{ width: '100%' }}>
+            {resending ? t('register.submitting') : t('login.resend')}
+          </button>
         )}
         <p className="muted" style={{ margin: 0 }}>
           {t('login.noAccount')}{' '}

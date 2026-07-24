@@ -25,6 +25,9 @@ export type AuthResponse = {
   token?: string;
   user?: WebUser;
   error?: string;
+  needVerification?: boolean;
+  email?: string;
+  message?: string;
 };
 
 export type MeResponse = {
@@ -52,11 +55,17 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function register(email: string, password: string, name?: string): Promise<AuthResponse> {
+export async function register(
+  email: string,
+  password: string,
+  passwordConfirm: string,
+  name?: string,
+  locale?: string
+): Promise<AuthResponse> {
   const res = await fetch('/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({ email, password, passwordConfirm, name, locale }),
   });
   return json(res);
 }
@@ -66,6 +75,15 @@ export async function login(email: string, password: string): Promise<AuthRespon
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
+  });
+  return json(res);
+}
+
+export async function resendVerification(email: string, locale?: string): Promise<AuthResponse> {
+  const res = await fetch('/auth/resend-verification', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, locale }),
   });
   return json(res);
 }

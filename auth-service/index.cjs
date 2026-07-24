@@ -15,6 +15,7 @@ const crypto = require('crypto');
 const { URL } = require('url');
 const { isValid, parse } = require('@tma.js/init-data-node');
 const { createWebAuth } = require('./webAuth.cjs');
+const { sendVerificationEmail, isMailConfigured } = require('./mail.cjs');
 
 const PORT = Number(process.env.PORT) || 3847;
 const TRIBUTE_API = (process.env.TRIBUTE_API_URL || 'https://tribute.tg/api/v1').replace(/\/$/, '');
@@ -400,6 +401,7 @@ const server = http.createServer(async (req, res) => {
       tributeApi: TRIBUTE_API,
       tributeKeyConfigured: Boolean(TRIBUTE_API_KEY),
       site: fs.existsSync(path.join(SITE_DIR, 'index.html')),
+      mailConfigured: isMailConfigured(),
     });
     return;
   }
@@ -517,13 +519,44 @@ const server = http.createServer(async (req, res) => {
       const result = webAuth.register({
         email: body.email,
         password: body.password,
+        passwordConfirm: body.passwordConfirm ?? body.password_confirm,
         name: body.name,
       });
       if (!result.ok) {
         sendJson(400, { success: false, error: result.error });
         return;
       }
-      sendJson(200, { success: true, token: result.token, user: result.user });
+      if (!isMailConfigured()) {
+        console.warn('[Mail] Not configured — cannot send verification email');
+        sendJson(503, {
+          success: false,
+          error:
+            'Почтовый сервер не настроен. Укажите SMTP_* или RESEND_API_KEY на сервере.',
+        });
+        return;
+      }
+      const base = AUTH_BASE_URL || `${url.protocol}//${req.headers.host}`;
+      const verifyUrl = `${base.replace(/\/$/, '')}/auth/verify-email?token=${encodeURIComponent(result.verifyToken)}`;
+      try {
+        await sendVerificationEmail({
+          email: result.email,
+          verifyUrl,
+          locale: body.locale || 'ru',
+        });
+      } catch (e) {
+        console.error('[Mail] send failed:', e.message);
+        sendJson(502, {
+          success: false,
+          error: 'Не удалось отправить письмо. Попробуйте позже или напишите в поддержку.',
+        });
+        return;
+      }
+      sendJson(200, {
+        success: true,
+        needVerification: true,
+        email: result.email,
+        message: 'Письмо с подтверждением отправлено на почту',
+      });
     } catch (e) {
       sendJson(400, { success: false, error: 'Некорректный запрос' });
     }
@@ -535,12 +568,62 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const result = webAuth.login({ email: body.email, password: body.password });
       if (!result.ok) {
-        sendJson(401, { success: false, error: result.error });
+        sendJson(401, {
+          success: false,
+          error: result.error,
+          needVerification: !!result.needVerification,
+          email: result.email || null,
+        });
         return;
       }
       sendJson(200, { success: true, token: result.token, user: result.user });
     } catch (e) {
       sendJson(400, { success: false, error: 'Некорректный запрос' });
+    }
+    return;
+  }
+
+  if (url.pathname === '/auth/verify-email' && req.method === 'GET') {
+    const token = url.searchParams.get('token') || '';
+    const result = webAuth.verifyEmail(token);
+    const site = AUTH_BASE_URL || `${url.protocol}//${req.headers.host}`;
+    if (!result.ok) {
+      res.writeHead(302, {
+        Location: `${site.replace(/\/$/, '')}/login?verify=fail&reason=${encodeURIComponent(result.error || 'error')}`,
+      });
+      res.end();
+      return;
+    }
+    res.writeHead(302, {
+      Location: `${site.replace(/\/$/, '')}/login?verify=ok`,
+    });
+    res.end();
+    return;
+  }
+
+  if (url.pathname === '/auth/resend-verification' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      if (!isMailConfigured()) {
+        sendJson(503, { success: false, error: 'Почтовый сервер не настроен' });
+        return;
+      }
+      const created = webAuth.createVerificationToken(body.email);
+      if (!created.ok) {
+        sendJson(400, { success: false, error: created.error });
+        return;
+      }
+      const base = AUTH_BASE_URL || `${url.protocol}//${req.headers.host}`;
+      const verifyUrl = `${base.replace(/\/$/, '')}/auth/verify-email?token=${encodeURIComponent(created.verifyToken)}`;
+      await sendVerificationEmail({
+        email: created.email,
+        verifyUrl,
+        locale: body.locale || 'ru',
+      });
+      sendJson(200, { success: true, message: 'Письмо отправлено снова' });
+    } catch (e) {
+      console.error('[Mail] resend failed:', e.message);
+      sendJson(502, { success: false, error: 'Не удалось отправить письмо' });
     }
     return;
   }

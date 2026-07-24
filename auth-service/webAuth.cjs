@@ -87,6 +87,7 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
       name: user.name || null,
       provider: 'email',
       telegramId: null,
+      emailVerified: user.emailVerified !== false,
       createdAt: user.createdAt,
       subscription: publicSubscription(user.subscription),
     };
@@ -177,7 +178,7 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     return null;
   }
 
-  function register({ email, password, name }) {
+  function register({ email, password, passwordConfirm, name }) {
     const em = normalizeEmail(email);
     if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
       return { ok: false, error: 'Укажите корректный email' };
@@ -185,12 +186,15 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     if (!password || String(password).length < 8) {
       return { ok: false, error: 'Пароль должен быть не короче 8 символов' };
     }
+    if (passwordConfirm == null || String(password) !== String(passwordConfirm)) {
+      return { ok: false, error: 'Пароли не совпадают' };
+    }
     if (users.has(em)) {
       return { ok: false, error: 'Аккаунт с таким email уже есть' };
     }
     const { salt, hash } = hashPassword(password);
     const now = new Date();
-    const trialEnd = new Date(now.getTime() + trialDays * 24 * 3600 * 1000);
+    const verifyToken = crypto.randomBytes(32).toString('hex');
     const user = {
       id: randomUUID(),
       email: em,
@@ -198,19 +202,21 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
       passwordSalt: salt,
       passwordHash: hash,
       createdAt: now.toISOString(),
-      subscription: trialDays > 0
-        ? {
-            active: true,
-            plan: 'trial',
-            status: 'trial',
-            expiresAt: trialEnd.toISOString(),
-          }
-        : { active: false, plan: null, status: 'none', expiresAt: null },
+      emailVerified: false,
+      emailVerifyToken: verifyToken,
+      emailVerifyExpires: new Date(now.getTime() + 24 * 3600 * 1000).toISOString(),
+      // Trial starts after email confirmation
+      subscription: { active: false, plan: null, status: 'pending_verification', expiresAt: null },
     };
     users.set(em, user);
     saveUsers();
-    const token = signToken(user);
-    return { ok: true, token, user: publicUser(user) };
+    return {
+      ok: true,
+      needVerification: true,
+      email: em,
+      verifyToken,
+      user: publicUser(user),
+    };
   }
 
   function login({ email, password }) {
@@ -219,7 +225,70 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     if (!user || !verifyPassword(password, user.passwordSalt, user.passwordHash)) {
       return { ok: false, error: 'Неверный email или пароль' };
     }
+    if (user.emailVerified === false) {
+      return {
+        ok: false,
+        error: 'Подтвердите email — мы отправили письмо со ссылкой',
+        needVerification: true,
+        email: em,
+      };
+    }
     return { ok: true, token: signToken(user), user: publicUser(user) };
+  }
+
+  function verifyEmail(token) {
+    const raw = String(token || '').trim();
+    if (!raw) return { ok: false, error: 'Нет токена' };
+    let found = null;
+    for (const u of users.values()) {
+      if (u.emailVerifyToken && u.emailVerifyToken === raw) {
+        found = u;
+        break;
+      }
+    }
+    if (!found) return { ok: false, error: 'Ссылка недействительна или уже использована' };
+    if (found.emailVerified) {
+      return { ok: true, already: true, user: publicUser(found) };
+    }
+    if (found.emailVerifyExpires) {
+      const exp = new Date(found.emailVerifyExpires).getTime();
+      if (!Number.isNaN(exp) && exp < Date.now()) {
+        return { ok: false, error: 'Срок ссылки истёк. Запросите письмо снова.' };
+      }
+    }
+    const now = new Date();
+    found.emailVerified = true;
+    found.emailVerifyToken = null;
+    found.emailVerifyExpires = null;
+    if (trialDays > 0) {
+      const trialEnd = new Date(now.getTime() + trialDays * 24 * 3600 * 1000);
+      found.subscription = {
+        active: true,
+        plan: 'trial',
+        status: 'trial',
+        expiresAt: trialEnd.toISOString(),
+      };
+    } else {
+      found.subscription = { active: false, plan: null, status: 'none', expiresAt: null };
+    }
+    users.set(found.email, found);
+    saveUsers();
+    return { ok: true, token: signToken(found), user: publicUser(found) };
+  }
+
+  function createVerificationToken(email) {
+    const em = normalizeEmail(email);
+    const user = users.get(em);
+    if (!user) return { ok: false, error: 'Пользователь не найден' };
+    if (user.emailVerified !== false) {
+      return { ok: false, error: 'Email уже подтверждён' };
+    }
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    user.emailVerifyToken = verifyToken;
+    user.emailVerifyExpires = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+    users.set(em, user);
+    saveUsers();
+    return { ok: true, email: em, verifyToken };
   }
 
   function me(token) {
@@ -307,6 +376,8 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     register,
     login,
     me,
+    verifyEmail,
+    createVerificationToken,
     listPlans,
     createOrder,
     activateSubscription,
