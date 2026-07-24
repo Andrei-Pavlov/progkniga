@@ -6,6 +6,7 @@ import { LoginPage } from './LoginPage';
 import { RegisterPage } from './RegisterPage';
 import { AccountPage } from './AccountPage';
 import { SubscribePage } from './SubscribePage';
+import { AdminPage } from './AdminPage';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="register" element={<RegisterPage />} />
           <Route path="subscribe" element={<SubscribePage />} />
           <Route path="account" element={<AccountPage />} />
+          <Route path="admin" element={<AdminPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

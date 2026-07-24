@@ -370,6 +370,65 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     return orders.get(orderId) || null;
   }
 
+  function listUsersSafe() {
+    return [...users.values()]
+      .map((u) => publicUser(u))
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  }
+
+  function listOrdersSafe() {
+    return [...orders.values()].sort((a, b) =>
+      String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+    );
+  }
+
+  function getWebStats() {
+    const all = [...users.values()];
+    const subs = { active: 0, expired: 0, trial: 0, pending_verification: 0, none: 0, other: 0 };
+    let verified = 0;
+    let unverified = 0;
+    for (const u of all) {
+      if (u.emailVerified === false) unverified += 1;
+      else verified += 1;
+      const pub = publicSubscription(u.subscription);
+      const status = u.subscription?.status || pub.status || 'none';
+      if (status === 'pending_verification') subs.pending_verification += 1;
+      else if (pub.active && (pub.plan === 'trial' || status === 'trial')) subs.trial += 1;
+      else if (pub.active) subs.active += 1;
+      else if (pub.status === 'expired' || status === 'expired') subs.expired += 1;
+      else if (status === 'none' || !u.subscription) subs.none += 1;
+      else subs.other += 1;
+    }
+    const orderList = listOrdersSafe();
+    let pending = 0;
+    let paid = 0;
+    let revenuePaidUsd = 0;
+    for (const o of orderList) {
+      if (o.status === 'paid') {
+        paid += 1;
+        revenuePaidUsd += Number(o.amountUsd) || 0;
+      } else {
+        pending += 1;
+      }
+    }
+    return {
+      users: {
+        total: all.length,
+        verified,
+        unverified,
+        subscriptions: subs,
+        recent: listUsersSafe().slice(0, 25),
+      },
+      orders: {
+        total: orderList.length,
+        pending,
+        paid,
+        revenuePaidUsd: Math.round(revenuePaidUsd * 100) / 100,
+        recent: orderList.slice(0, 25),
+      },
+    };
+  }
+
   return {
     secret,
     PLANS,
@@ -383,6 +442,9 @@ function createWebAuth({ dataDir, jwtSecret, trialDays = 7 }) {
     activateSubscription,
     markOrderPaid,
     getOrder,
+    listUsersSafe,
+    listOrdersSafe,
+    getWebStats,
     publicUser,
     publicTelegramUser,
     verifyToken,

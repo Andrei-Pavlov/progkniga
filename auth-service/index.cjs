@@ -134,6 +134,52 @@ function getBearerToken(req, url) {
   return (url.searchParams.get('token') || '').trim();
 }
 
+function isAdminAuthorized(req, url) {
+  const token = getBearerToken(req, url);
+  const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
+  const remote = forwarded || req.socket?.remoteAddress || '';
+  const isLocal = /^(127\.|::1|::ffff:127\.|localhost)/i.test(remote) || remote === '';
+  const hasToken = Boolean(ADMIN_TOKEN) && token === ADMIN_TOKEN;
+  return { ok: isLocal || hasToken, isLocal, hasToken };
+}
+
+function telegramStats() {
+  let active = 0;
+  let expired = 0;
+  let cancelled = 0;
+  const bySource = {};
+  const recent = [];
+  for (const [telegramId, sub] of subscriptions.entries()) {
+    const valid = isSubscriptionValid(sub);
+    if (valid) active += 1;
+    else expired += 1;
+    if (sub?.status === 'cancelled') cancelled += 1;
+    const src = sub?.source || 'unknown';
+    bySource[src] = (bySource[src] || 0) + 1;
+    recent.push({
+      telegramId,
+      active: valid,
+      status: sub?.status ?? null,
+      expiresAt: sub?.expiresAt ?? null,
+      type: sub?.type ?? null,
+      source: src,
+      telegramUsername: sub?.telegramUsername ?? null,
+      email: sub?.email ?? null,
+      updatedAt: sub?.updatedAt ?? null,
+    });
+  }
+  recent.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  return {
+    total: subscriptions.size,
+    active,
+    expired,
+    cancelled,
+    bySource,
+    recent: recent.slice(0, 50),
+    channel: TELEGRAM_CHANNEL,
+  };
+}
+
 async function readJsonBody(req) {
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -150,7 +196,7 @@ function tryServeStatic(req, res, urlPath) {
 
   let filePath = candidate;
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    const spaRoutes = ['/download', '/login', '/register', '/account', '/subscribe'];
+    const spaRoutes = ['/download', '/login', '/register', '/account', '/subscribe', '/admin'];
     if (spaRoutes.some((r) => rel === r || rel.startsWith(r + '/'))) {
       filePath = path.join(SITE_DIR, 'index.html');
     } else if (!fs.existsSync(filePath)) {
@@ -715,11 +761,8 @@ const server = http.createServer(async (req, res) => {
     const email = url.searchParams.get('email');
     const planId = url.searchParams.get('plan') || 'monthly';
     const orderId = url.searchParams.get('orderId');
-    const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0]?.trim();
-    const remote = forwarded || req.socket?.remoteAddress || '';
-    const isLocal = /^(127\.|::1|localhost)/.test(remote) || remote === '';
-    const hasToken = ADMIN_TOKEN && token === ADMIN_TOKEN;
-    if (!isLocal && !hasToken) {
+    const authz = isAdminAuthorized(req, url);
+    if (!authz.ok) {
       sendJson(403, { error: 'Only localhost or valid token' });
       return;
     }
@@ -734,6 +777,50 @@ const server = http.createServer(async (req, res) => {
     }
     const activated = webAuth.activateSubscription(email, planId);
     sendJson(activated.ok ? 200 : 400, activated.ok ? { success: true, user: activated.user } : { success: false, error: activated.error });
+    return;
+  }
+
+  // Admin dashboard stats (website + Telegram)
+  if (url.pathname === '/admin/stats' && req.method === 'GET') {
+    const authz = isAdminAuthorized(req, url);
+    if (!authz.ok) {
+      sendJson(401, { success: false, error: 'Unauthorized' });
+      return;
+    }
+    const web = webAuth.getWebStats();
+    sendJson(200, {
+      success: true,
+      generatedAt: new Date().toISOString(),
+      website: web,
+      telegram: telegramStats(),
+      health: {
+        tributeKeyConfigured: Boolean(TRIBUTE_API_KEY),
+        mailConfigured: isMailConfigured(),
+        adminTokenConfigured: Boolean(ADMIN_TOKEN),
+      },
+    });
+    return;
+  }
+
+  if (url.pathname === '/admin/users' && req.method === 'GET') {
+    const authz = isAdminAuthorized(req, url);
+    if (!authz.ok) {
+      sendJson(401, { success: false, error: 'Unauthorized' });
+      return;
+    }
+    const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') || 100)));
+    sendJson(200, { success: true, users: webAuth.listUsersSafe().slice(0, limit) });
+    return;
+  }
+
+  if (url.pathname === '/admin/orders' && req.method === 'GET') {
+    const authz = isAdminAuthorized(req, url);
+    if (!authz.ok) {
+      sendJson(401, { success: false, error: 'Unauthorized' });
+      return;
+    }
+    const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') || 100)));
+    sendJson(200, { success: true, orders: webAuth.listOrdersSafe().slice(0, limit) });
     return;
   }
 
