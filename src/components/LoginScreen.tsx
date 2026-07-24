@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, FormEvent, CSSProperties } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useStore } from '../store';
 import { useUpdater } from '../hooks/useUpdater';
@@ -7,13 +7,27 @@ import QRCode from 'qrcode';
 const TELEGRAM_BOT = 'StoWeaBot';
 const TELEGRAM_CHANNEL = 'WeaverStory';
 
+type WebAuthResponse = {
+  success?: boolean;
+  token?: string;
+  error?: string;
+  user?: {
+    subscription?: { active?: boolean; status?: string; expiresAt?: string | null };
+  };
+};
+
 export function LoginScreen() {
   const setAuthenticated = useStore((s) => s.setAuthenticated);
   const setDemoUser = useStore((s) => s.setDemoUser);
+  const setWebToken = useStore((s) => s.setWebToken);
   const { update, checking, downloading, checkForUpdates, installAndRelaunch } = useUpdater();
   const [loading, setLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
   const [appVersion, setAppVersion] = useState('');
+  const [siteUrl, setSiteUrl] = useState('https://progkniga-production.up.railway.app');
   const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showQr, setShowQr] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
@@ -22,11 +36,47 @@ export function LoginScreen() {
 
   useEffect(() => {
     invoke<string>('get_app_version').then(setAppVersion).catch(() => {});
+    invoke<string>('get_auth_service_url').then(setSiteUrl).catch(() => {});
     checkForUpdates();
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [checkForUpdates]);
+
+  const finishWebLogin = (token: string, active: boolean) => {
+    if (!active) {
+      setError('Подписка неактивна. Оформите её на сайте.');
+      return;
+    }
+    setWebToken(token);
+    setDemoUser(false);
+    setAuthenticated(true);
+  };
+
+  const handleEmailLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setEmailLoading(true);
+    try {
+      const res = await invoke<WebAuthResponse>('web_auth_login', {
+        email: email.trim(),
+        password,
+      });
+      if (!res.success || !res.token) {
+        setError(res.error || 'Не удалось войти');
+        return;
+      }
+      finishWebLogin(res.token, Boolean(res.user?.subscription?.active));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const openSite = (path = '/register') => {
+    invoke('open_telegram_auth', { url: `${siteUrl.replace(/\/$/, '')}${path}` });
+  };
 
   const startPolling = (sessionId: string) => {
     pollRef.current = setInterval(async () => {
@@ -41,6 +91,7 @@ export function LoginScreen() {
           }
           setLoading(false);
           setShowQr(false);
+          setWebToken(null);
           setDemoUser(false);
           setAuthenticated(true);
         }
@@ -81,8 +132,20 @@ export function LoginScreen() {
   };
 
   const handleDemoLogin = () => {
+    setWebToken(null);
     setDemoUser(true);
     setAuthenticated(true);
+  };
+
+  const inputStyle: CSSProperties = {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: 14,
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    boxSizing: 'border-box',
   };
 
   return (
@@ -95,16 +158,106 @@ export function LoginScreen() {
         height: '100vh',
         gap: 24,
         background: 'var(--bg-primary)',
+        padding: 24,
+        boxSizing: 'border-box',
       }}
     >
       <h1 style={{ fontSize: 32, margin: 0 }}>StoryWeaver</h1>
       <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
         Профессиональное приложение для писателей
       </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 24 }}>
+
+      <form
+        onSubmit={handleEmailLogin}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          width: 'min(360px, 100%)',
+          marginTop: 8,
+        }}
+      >
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center' }}>
+          Вход с аккаунта сайта
+        </p>
+        <input
+          type="email"
+          autoComplete="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          style={inputStyle}
+        />
+        <input
+          type="password"
+          autoComplete="current-password"
+          placeholder="Пароль"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={8}
+          style={inputStyle}
+        />
+        <button
+          type="submit"
+          disabled={emailLoading || loading}
+          style={{
+            padding: '12px 32px',
+            fontSize: 16,
+            background: 'var(--accent)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 8,
+            cursor: emailLoading ? 'wait' : 'pointer',
+          }}
+        >
+          {emailLoading ? 'Вход...' : 'Войти'}
+        </button>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center' }}>
+          Нет аккаунта?{' '}
+          <button
+            type="button"
+            onClick={() => openSite('/register')}
+            style={{
+              padding: 0,
+              border: 'none',
+              background: 'none',
+              color: 'var(--accent)',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              fontSize: 12,
+            }}
+          >
+            Зарегистрироваться на сайте
+          </button>
+        </p>
+      </form>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          width: 'min(360px, 100%)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            color: 'var(--text-secondary)',
+            fontSize: 12,
+          }}
+        >
+          <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          или
+          <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        </div>
         <button
           onClick={handleTelegramLogin}
-          disabled={loading}
+          disabled={loading || emailLoading}
           style={{
             padding: '12px 32px',
             fontSize: 16,
@@ -132,9 +285,34 @@ export function LoginScreen() {
           Тест для писателей (без авторизации)
         </button>
       </div>
-      {error && <p style={{ color: 'var(--error)', margin: 0, fontSize: 13 }}>{error}</p>}
-      <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: 12, textAlign: 'center', maxWidth: 320 }}>
-        Оплатите подписку через Tribute, затем подпишитесь на канал t.me/{TELEGRAM_CHANNEL}. Вход проверяет оба шага.
+
+      {error && (
+        <p style={{ color: 'var(--error)', margin: 0, fontSize: 13, textAlign: 'center', maxWidth: 360 }}>
+          {error}
+          {error.includes('Подписка') && (
+            <>
+              {' '}
+              <button
+                type="button"
+                onClick={() => openSite('/subscribe')}
+                style={{
+                  padding: 0,
+                  border: 'none',
+                  background: 'none',
+                  color: 'var(--accent)',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  fontSize: 13,
+                }}
+              >
+                Открыть подписку
+              </button>
+            </>
+          )}
+        </p>
+      )}
+      <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: 12, textAlign: 'center', maxWidth: 360 }}>
+        Telegram: Tribute + канал t.me/{TELEGRAM_CHANNEL}. Сайт: email-аккаунт и подписка на сайте.
       </p>
 
       <div

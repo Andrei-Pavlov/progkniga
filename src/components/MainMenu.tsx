@@ -9,9 +9,8 @@ interface MainMenuProps {
 export function MainMenu({ onExportWord }: MainMenuProps) {
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const setSearchOpen = useStore((s) => s.setSearchOpen);
-  const setAuthenticated = useStore((s) => s.setAuthenticated);
-  const setDemoUser = useStore((s) => s.setDemoUser);
   const setCurrentProject = useStore((s) => s.setCurrentProject);
+  const clearSession = useStore((s) => s.clearSession);
   const { update, checking, downloading, error, checkForUpdates, installAndRelaunch } = useUpdater();
 
   useEffect(() => {
@@ -23,9 +22,7 @@ export function MainMenu({ onExportWord }: MainMenuProps) {
   };
 
   const handleLogout = () => {
-    setDemoUser(false);
-    setAuthenticated(false);
-    setCurrentProject(null);
+    clearSession();
   };
 
   return (

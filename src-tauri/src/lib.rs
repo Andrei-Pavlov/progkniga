@@ -19,7 +19,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_app_data_path,
             commands::get_app_version,
+            commands::get_auth_service_url,
             commands::poll_auth_session,
+            commands::web_auth_login,
+            commands::web_auth_me,
             commands::open_telegram_auth,
             commands::open_project,
             commands::create_project,

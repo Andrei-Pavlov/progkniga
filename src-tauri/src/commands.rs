@@ -25,6 +25,11 @@ fn auth_service_url() -> &'static str {
 }
 
 #[tauri::command]
+pub fn get_auth_service_url() -> String {
+    auth_service_url().trim_end_matches('/').to_string()
+}
+
+#[tauri::command]
 pub async fn poll_auth_session(session_id: String) -> Result<bool, String> {
     let url = format!(
         "{}/auth/session/{}",
@@ -42,6 +47,34 @@ pub async fn poll_auth_session(session_id: String) -> Result<bool, String> {
         .get("success")
         .and_then(|v| v.as_bool())
         .unwrap_or(false))
+}
+
+#[tauri::command]
+pub async fn web_auth_login(email: String, password: String) -> Result<serde_json::Value, String> {
+    let url = format!("{}/auth/login", auth_service_url().trim_end_matches('/'));
+    let client = reqwest::Client::new();
+    let res = client
+        .post(&url)
+        .json(&serde_json::json!({ "email": email.trim(), "password": password }))
+        .send()
+        .await
+        .map_err(|e| format!("Auth service: {}", e))?;
+    let json: serde_json::Value = res.json().await.map_err(|e| format!("Parse: {}", e))?;
+    Ok(json)
+}
+
+#[tauri::command]
+pub async fn web_auth_me(token: String) -> Result<serde_json::Value, String> {
+    let url = format!("{}/auth/me", auth_service_url().trim_end_matches('/'));
+    let client = reqwest::Client::new();
+    let res = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token.trim()))
+        .send()
+        .await
+        .map_err(|e| format!("Auth service: {}", e))?;
+    let json: serde_json::Value = res.json().await.map_err(|e| format!("Parse: {}", e))?;
+    Ok(json)
 }
 
 #[tauri::command]
